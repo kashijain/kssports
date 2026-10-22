@@ -217,18 +217,21 @@ opsRouter.get(
 opsRouter.post(
   '/catalog/preview',
   asyncHandler(async (req, res) => {
-    const products = await catalogProducts(req.auth!.businessId!, catalogQuery(req.body || {}));
-    res.type('html').send(await renderCatalogHtml(req.auth!.businessId!, products));
+    const query = catalogQuery(req.body || {});
+    const products = await catalogProducts(req.auth!.businessId!, query);
+    res.type('html').send(await renderCatalogHtml(req.auth!.businessId!, products, false, query.priceMode));
   }),
 );
 
 opsRouter.get(
   '/catalog/pdf',
   asyncHandler(async (req, res) => {
-    const products = await catalogProducts(req.auth!.businessId!, catalogQuery(req.query as Record<string, unknown>));
-    const pdf = await htmlToPdf(await renderCatalogHtml(req.auth!.businessId!, products));
+    const query = catalogQuery(req.query as Record<string, unknown>);
+    const products = await catalogProducts(req.auth!.businessId!, query);
+    const pdf = await htmlToPdf(await renderCatalogHtml(req.auth!.businessId!, products, false, query.priceMode));
+    const filename = query.priceMode === 'wholesale' ? 'ks-sports-wholesale-catalog.pdf' : query.priceMode === 'retail' ? 'ks-sports-retail-catalog.pdf' : 'ks-sports-catalog.pdf';
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', 'attachment; filename="ks-sports-catalog.pdf"');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.send(pdf);
   }),
 );
@@ -236,8 +239,9 @@ opsRouter.get(
 opsRouter.get(
   '/catalog/html',
   asyncHandler(async (req, res) => {
-    const products = await catalogProducts(req.auth!.businessId!, catalogQuery(req.query as Record<string, unknown>));
-    res.type('html').send(await renderCatalogHtml(req.auth!.businessId!, products, req.query.print === '1'));
+    const query = catalogQuery(req.query as Record<string, unknown>);
+    const products = await catalogProducts(req.auth!.businessId!, query);
+    res.type('html').send(await renderCatalogHtml(req.auth!.businessId!, products, req.query.print === '1', query.priceMode));
   }),
 );
 
@@ -487,6 +491,7 @@ function catalogQuery(source: Record<string, unknown>) {
     maxPrice: source.maxPrice === '' || source.maxPrice == null ? undefined : Number(source.maxPrice),
     activeOnly: source.activeOnly !== '0' && source.activeOnly !== false,
     wholesaleOnly: source.wholesaleOnly === '1' || source.wholesaleOnly === true,
+    priceMode: (source.priceMode === 'retail' || source.priceMode === 'wholesale' ? source.priceMode : '') as 'retail' | 'wholesale' | '',
     ids,
   };
 }

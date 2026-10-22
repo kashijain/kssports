@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuth, useMeta } from '../auth';
 import { Button, Dialog, Empty, Field, PageHeader, SelectInput, Spinner, TextArea, TextInput } from '../components/ui';
-import { api } from '../lib/api';
+import { api, downloadFile } from '../lib/api';
 import { inr } from '../lib/format';
 import { fail } from '../lib/toast';
 import type { Product, TaxRate } from '../types';
@@ -59,6 +59,8 @@ export function Products() {
   const [draft, setDraft] = useState<Draft>(emptyDraft());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [picked, setPicked] = useState<string[]>([]);
 
   function load(query = q) {
     const params = new URLSearchParams({ limit: '100' });
@@ -87,6 +89,7 @@ export function Products() {
     const first = rates.find((rate) => rate.active);
     setEditing(null);
     setDraft(emptyDraft(first ? String(first.rate) : '0'));
+    setPhoto(null);
     setOpen(true);
   }
 
@@ -110,6 +113,7 @@ export function Products() {
       description: product.description,
       status: product.status || 'active',
     });
+    setPhoto(null);
     setOpen(true);
   }
 
@@ -136,7 +140,12 @@ export function Products() {
         description: draft.description,
       };
       const path = editing ? `/api/products/${editing.id}` : '/api/products';
-      await api(path, { method: editing ? 'PUT' : 'POST', body: JSON.stringify(payload) });
+      const saved = await api<{ product: Product }>(path, { method: editing ? 'PUT' : 'POST', body: JSON.stringify(payload) });
+      if (photo) {
+        const body = new FormData();
+        body.append('file', photo);
+        await api(`/api/products/${saved.product.id}/images`, { method: 'POST', body });
+      }
       toast.success(editing ? 'Product updated.' : 'Product added.');
       setOpen(false);
       load();
@@ -159,64 +168,88 @@ export function Products() {
   }
 
   const active = rates.filter((rate) => rate.active);
+  const chosen = picked.length && rows ? rows.filter((product) => picked.includes(product.id)) : rows || [];
+
+  async function downloadCatalogFor(product: Product, mode: 'retail' | 'wholesale') {
+    if (mode === 'wholesale' && product.wholesalePrice == null) {
+      toast.error('Add a wholesale price before downloading that catalog.');
+      return;
+    }
+    try {
+      await downloadFile(`/api/catalog/pdf?priceMode=${mode}&ids=${product.id}`, `${product.sku || 'product'}-${mode}.pdf`);
+    } catch (err) {
+      fail(err);
+    }
+  }
+
+  async function downloadCatalog(mode: 'retail' | 'wholesale') {
+    const list = mode === 'wholesale' ? chosen.filter((product) => product.wholesalePrice != null) : chosen;
+    if (!list.length) {
+      toast.error(mode === 'wholesale' ? 'Add a wholesale price before downloading that catalog.' : 'Add a product first.');
+      return;
+    }
+    const params = new URLSearchParams({ priceMode: mode, ids: list.map((product) => product.id).join(',') });
+    try {
+      await downloadFile(`/api/catalog/pdf?${params}`, `ks-sports-${mode}-catalog.pdf`);
+    } catch (err) {
+      fail(err);
+    }
+  }
 
   return (
     <div>
       <PageHeader
-        title="Products & services"
-        lede={business?.gstEnabled ? 'Prices follow your invoice setting: tax extra, or tax included. GST rates come from Settings.' : 'Without a GSTIN, new bills ignore GST even if a product has a rate.'}
-        action={<Button onClick={startNew}>Add product</Button>}
+        title="Products"
+        lede="One list for every KS Sports product. Add a photo, a retail price, and a wholesale price. The retail catalog PDF uses retail prices. The wholesale catalog PDF uses wholesale prices."
+        action={
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" onClick={() => void downloadCatalog('retail')}>Retail catalog PDF</Button>
+            <Button variant="secondary" onClick={() => void downloadCatalog('wholesale')}>Wholesale catalog PDF</Button>
+            <Button onClick={startNew}>Add product</Button>
+          </div>
+        }
       />
-      <TextInput className="mb-4 max-w-md" placeholder="Search name, SKU, HSN, category" value={q} onChange={(event) => setQ(event.target.value)} />
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <TextInput className="max-w-md" placeholder="Search name, SKU, HSN, category" value={q} onChange={(event) => setQ(event.target.value)} />
+        {rows && rows.length > 0 ? (
+          <button type="button" className="text-sm font-semibold" onClick={() => setPicked(picked.length === rows.length ? [] : rows.map((product) => product.id))}>
+            {picked.length === rows.length ? 'Clear selection' : 'Select all'}
+          </button>
+        ) : null}
+      </div>
       {error ? <Empty title="Could not load products" body={error} action={<Button variant="secondary" onClick={() => load()}>Try again</Button>} /> : null}
       {!rows && !error ? <Spinner /> : null}
       {rows && rows.length === 0 ? <Empty title="Nothing to bill yet" body="Add a product or a service such as stitching, repair, or a day’s labour." action={<Button onClick={startNew}>Add product</Button>} /> : null}
       {rows && rows.length > 0 ? (
-        <div className="overflow-x-auto rounded-3xl border border-line bg-card">
-          <table className="w-full min-w-[760px] text-left text-sm">
-            <thead className="text-xs uppercase tracking-wide text-muted">
-              <tr>
-                <th className="px-4 py-3">Item</th>
-                <th>HSN/SAC</th>
-                <th>Price</th>
-                <th>GST</th>
-                <th>Stock</th>
-                <th className="px-4"> </th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((product) => (
-                <tr key={product.id} className="border-t border-line">
-                  <td className="px-4 py-3">
-                    <Link to={`/products/${product.id}`} className="font-semibold">{product.name}</Link>
-                    <p className="text-xs text-muted">{[product.sku, product.category, product.unit].filter(Boolean).join(' · ')}</p>
-                  </td>
-                  <td>{product.hsnSac || '—'}</td>
-                  <td className="tabular">{inr(product.sellingPrice)}</td>
-                  <td>{product.gstRate}%</td>
-                  <td>
-                    {product.trackStock ? (
-                      <span className={product.stockQuantity !== null && product.stockQuantity <= product.lowStockThreshold ? 'text-clay-dark' : ''}>
-                        {product.stockQuantity} {product.unit}
-                      </span>
-                    ) : (
-                      '—'
-                    )}
-                  </td>
-                  <td className="px-4">
-                    <div className="flex gap-2">
-                      <Button variant="secondary" onClick={() => startEdit(product)}>
-                        Edit
-                      </Button>
-                      <Button variant="ghost" onClick={() => void remove(product)}>
-                        Delete
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {rows.map((product) => (
+            <article key={product.id} className="rounded-3xl border border-line bg-card p-4">
+              <div className="mb-3 flex aspect-[4/3] items-center justify-center overflow-hidden rounded-2xl bg-paper">
+                {product.images?.[0]?.url ? <img src={product.images[0].url} alt="" className="h-full w-full object-cover" /> : <img src="/logo.png" alt="" className="h-16 w-16 rounded-full object-cover" />}
+              </div>
+              <div className="flex items-start gap-2">
+                <input
+                  type="checkbox"
+                  aria-label={`Include ${product.name}`}
+                  checked={picked.includes(product.id)}
+                  onChange={(event) => setPicked((current) => (event.target.checked ? [...current, product.id] : current.filter((id) => id !== product.id)))}
+                />
+                <div className="min-w-0 flex-1">
+                  <Link to={`/products/${product.id}`} className="font-semibold">{product.name}</Link>
+                  <p className="text-xs text-muted">{[product.sku, product.category, product.unit].filter(Boolean).join(' · ') || 'No SKU'}</p>
+                  <p className="mt-1 text-sm">Retail {inr(product.sellingPrice)}</p>
+                  <p className="text-sm">{product.wholesalePrice == null ? 'Wholesale not set' : `Wholesale ${inr(product.wholesalePrice)}`}</p>
+                  <p className="text-xs text-muted">{product.trackStock ? `${product.stockQuantity ?? 0} ${product.unit} in stock` : 'Stock not tracked'} · GST {product.gstRate}%</p>
+                </div>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button variant="secondary" onClick={() => startEdit(product)}>Edit</Button>
+                <Button variant="ghost" onClick={() => void downloadCatalogFor(product, 'retail')}>Retail PDF</Button>
+                <Button variant="ghost" disabled={product.wholesalePrice == null} onClick={() => void downloadCatalogFor(product, 'wholesale')}>Wholesale PDF</Button>
+                <Button variant="ghost" onClick={() => void remove(product)}>Delete</Button>
+              </div>
+            </article>
+          ))}
         </div>
       ) : null}
 
@@ -240,11 +273,14 @@ export function Products() {
           <Field label="Brand">
             <TextInput value={draft.brand} onChange={(event) => setDraft({ ...draft, brand: event.target.value })} />
           </Field>
-          <Field label="Purchase price">
-            <TextInput inputMode="decimal" value={draft.purchasePrice} onChange={(event) => setDraft({ ...draft, purchasePrice: event.target.value })} />
+          <Field label="Retail price">
+            <TextInput inputMode="decimal" value={draft.sellingPrice} onChange={(event) => setDraft({ ...draft, sellingPrice: event.target.value })} required />
           </Field>
           <Field label="Wholesale price">
             <TextInput inputMode="decimal" value={draft.wholesalePrice} onChange={(event) => setDraft({ ...draft, wholesalePrice: event.target.value })} />
+          </Field>
+          <Field label="Purchase price">
+            <TextInput inputMode="decimal" value={draft.purchasePrice} onChange={(event) => setDraft({ ...draft, purchasePrice: event.target.value })} />
           </Field>
           <Field label="Status">
             <SelectInput value={draft.status} onChange={(event) => setDraft({ ...draft, status: event.target.value as 'active' | 'inactive' })}>
@@ -261,9 +297,19 @@ export function Products() {
               ))}
             </SelectInput>
           </Field>
-          <Field label={settings?.defaults.priceMode === 'inclusive' ? 'Selling price (incl. GST)' : 'Selling price'}>
-            <TextInput inputMode="decimal" value={draft.sellingPrice} onChange={(event) => setDraft({ ...draft, sellingPrice: event.target.value })} required />
-          </Field>
+          <div className="sm:col-span-2">
+            <Field label="Product image">
+              <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => setPhoto(event.target.files?.[0] || null)} />
+            </Field>
+            {photo ? <p className="mt-1 text-xs text-muted">{photo.name} will be saved with this product.</p> : null}
+            {editing?.images?.length ? (
+              <div className="mt-2 flex gap-2">
+                {editing.images.map((image) => (
+                  <img key={image.id} src={image.url} alt="" className="h-16 w-16 rounded-xl object-cover" />
+                ))}
+              </div>
+            ) : null}
+          </div>
           {business?.gstEnabled ? (
             <Field label="GST rate">
               <SelectInput value={draft.gstRate} onChange={(event) => setDraft({ ...draft, gstRate: event.target.value })}>

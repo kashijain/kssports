@@ -131,6 +131,13 @@ describe('KS Sports operations', () => {
     expect(html.text).toContain('Batting Gloves');
     expect(html.text).toContain('Wholesale price');
 
+    const retail = await agent.post('/api/catalog/preview').send({ ids: product.body.product.id, priceMode: 'retail' });
+    expect(retail.text).toContain('Retail price: ₹1,800.00');
+    expect(retail.text).not.toContain('Wholesale price');
+    const wholesale = await agent.post('/api/catalog/preview').send({ ids: product.body.product.id, priceMode: 'wholesale' });
+    expect(wholesale.text).toContain('Wholesale price: ₹1,400.00');
+    expect(wholesale.text).not.toContain('Retail price');
+
     const pdf = await agent.get(`/api/catalog/pdf?ids=${product.body.product.id}`).buffer(true);
     expect(pdf.status).toBe(200);
     expect(pdf.body.subarray(0, 4).toString()).toBe('%PDF');

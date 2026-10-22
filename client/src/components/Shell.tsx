@@ -1,6 +1,5 @@
 import {
   Bell,
-  BookOpen,
   Cog,
   FolderOpen,
   LayoutDashboard,
@@ -31,7 +30,6 @@ const links = [
   { to: '/sales', label: 'Sales', icon: ShoppingBag, end: false },
   { to: '/customers', label: 'Customers', icon: Users, end: false },
   { to: '/products', label: 'Products', icon: Package, end: true },
-  { to: '/catalog', label: 'Product Catalog', icon: BookOpen, end: false },
   { to: '/purchases', label: 'Wholesale Purchases', icon: Truck, end: false },
   { to: '/invoices', label: 'Retail Sales', icon: Store, end: true },
   { to: '/machines', label: 'Machines', icon: Cog, end: false },

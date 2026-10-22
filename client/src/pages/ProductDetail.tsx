@@ -71,7 +71,8 @@ export function ProductDetail() {
           <div className="flex flex-wrap gap-2">
             <Link to="/products"><Button variant="secondary">Edit in products</Button></Link>
             <Link to={`/invoices/new?product=${product.id}`}><Button>Create sale</Button></Link>
-            <Button variant="secondary" onClick={() => void downloadFile(`/api/catalog/pdf?ids=${product.id}`, `${product.sku || 'product'}.pdf`).catch(fail)}>Download catalog entry</Button>
+            <Button variant="secondary" onClick={() => void downloadFile(`/api/catalog/pdf?priceMode=retail&ids=${product.id}`, `${product.sku || 'product'}-retail.pdf`).catch(fail)}>Retail PDF</Button>
+            <Button variant="secondary" disabled={product.wholesalePrice == null} onClick={() => void downloadFile(`/api/catalog/pdf?priceMode=wholesale&ids=${product.id}`, `${product.sku || 'product'}-wholesale.pdf`).catch(fail)}>Wholesale PDF</Button>
           </div>
         }
       />

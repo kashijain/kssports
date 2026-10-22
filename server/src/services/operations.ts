@@ -356,13 +356,14 @@ export async function catalogProducts(businessId: string, query: {
   maxPrice?: number;
   activeOnly?: boolean;
   wholesaleOnly?: boolean;
+  priceMode?: 'retail' | 'wholesale' | '';
   ids?: string[];
 }) {
   const filter: Record<string, unknown> = { businessId, archived: { $ne: true } };
   if (query.activeOnly !== false) filter.status = { $ne: 'inactive' };
   if (query.category) filter.category = query.category;
   if (query.brand) filter.brand = query.brand;
-  if (query.wholesaleOnly) filter.wholesalePrice = { $ne: null };
+  if (query.wholesaleOnly || query.priceMode === 'wholesale') filter.wholesalePrice = { $ne: null };
   if (query.ids?.length) filter._id = { $in: query.ids };
   if (query.minPrice != null || query.maxPrice != null) {
     filter.sellingPrice = {
@@ -374,12 +375,12 @@ export async function catalogProducts(businessId: string, query: {
   return Product.find(filter).sort({ category: 1, name: 1 }).limit(80);
 }
 
-export async function renderCatalogHtml(businessId: string, products: { name: string; sku?: string; description?: string; specifications?: { label?: string; value?: string }[]; sellingPrice: number; wholesalePrice?: number | null; gstRate?: number; hsnSac?: string; unit?: string; images?: { path?: string }[]; brand?: string; category?: string }[], autoPrint = false) {
+export async function renderCatalogHtml(businessId: string, products: { name: string; sku?: string; description?: string; specifications?: { label?: string; value?: string }[]; sellingPrice: number; wholesalePrice?: number | null; gstRate?: number; hsnSac?: string; unit?: string; images?: { path?: string }[]; brand?: string; category?: string }[], autoPrint = false, priceMode?: 'retail' | 'wholesale' | '') {
   const business = await Business.findById(businessId);
   const settings = await BusinessSettings.findOne({ businessId });
   if (!business) throw new HttpError(404, 'Business profile not found.');
-  const showRetail = settings?.catalog?.showRetail !== false;
-  const showWholesale = settings?.catalog?.showWholesale !== false;
+  const showRetail = priceMode === 'wholesale' ? false : priceMode === 'retail' ? true : settings?.catalog?.showRetail !== false;
+  const showWholesale = priceMode === 'retail' ? false : priceMode === 'wholesale' ? true : settings?.catalog?.showWholesale !== false;
   const showGst = Boolean(settings?.catalog?.showGst);
   const layout = settings?.catalog?.layout === 'list' ? 'list' : 'grid';
   const perPage = Math.min(12, Math.max(1, Number(settings?.catalog?.perPage) || 6));
@@ -396,7 +397,7 @@ export async function renderCatalogHtml(businessId: string, products: { name: st
         ${product.description ? `<p class="desc">${escapeHtml(product.description)}</p>` : ''}
         <div class="specs">${specs}</div>
         ${showRetail ? `<p class="price">Retail price: ₹${format(product.sellingPrice)}</p>` : ''}
-        ${showWholesale && product.wholesalePrice != null ? `<p class="price alt">Wholesale price: ₹${format(product.wholesalePrice)}</p>` : ''}
+        ${showWholesale && product.wholesalePrice != null ? `<p class="price">Wholesale price: ₹${format(product.wholesalePrice)}</p>` : ''}
         ${showGst ? `<p class="fine">GST ${product.gstRate || 0}%${product.hsnSac ? ` · HSN/SAC ${escapeHtml(product.hsnSac)}` : ''}</p>` : ''}
       </article>`;
     }),
@@ -423,7 +424,7 @@ export async function renderCatalogHtml(businessId: string, products: { name: st
       .price.alt { font-weight: 600; color: #1d6b58; }
       @media print { .grid { grid-template-columns: ${layout === 'list' ? '1fr' : '1fr 1fr'}; } }
     </style></head><body>
-    <header>${mark}<div><h1>KS SPORTS</h1><p class="tag">Sports Equipment &amp; Accessories</p><p class="tag">${escapeHtml(business.name)} · ${escapeHtml(address)}</p><p class="tag">${escapeHtml(business.mobile || '')}${business.email ? ` · ${escapeHtml(business.email)}` : ''}${business.gstin ? ` · GSTIN ${escapeHtml(business.gstin)}` : ''}</p></div></header>
+    <header>${mark}<div><h1>KS SPORTS</h1><p class="tag">${priceMode === 'wholesale' ? 'Wholesale price list' : priceMode === 'retail' ? 'Retail price list' : 'Sports Equipment &amp; Accessories'}</p><p class="tag">${escapeHtml(business.name)} · ${escapeHtml(address)}</p><p class="tag">${escapeHtml(business.mobile || '')}${business.email ? ` · ${escapeHtml(business.email)}` : ''}${business.gstin ? ` · GSTIN ${escapeHtml(business.gstin)}` : ''}</p></div></header>
     ${
       cards.length
         ? Array.from({ length: Math.ceil(cards.length / perPage) }, (_, index) => `<section class="page grid">${cards.slice(index * perPage, index * perPage + perPage).join('')}</section>`).join('')
