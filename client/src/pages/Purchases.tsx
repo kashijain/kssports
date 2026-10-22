@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { DocumentFileLink } from '../components/DocumentFileLink';
 import { StateSelect } from '../components/StateSelect';
 import { Badge, Button, Dialog, Empty, Field, PageHeader, SelectInput, Spinner, TextInput } from '../components/ui';
 import { api } from '../lib/api';
@@ -141,8 +142,8 @@ export function Purchases() {
             <div key={doc.id} className="mt-2 flex flex-wrap items-center gap-3 text-sm">
               <span>{doc.name}</span>
               <span className="text-muted">{doc.fileType} · {(doc.size / 1024).toFixed(0)} KB</span>
-              <a className="font-semibold" href={`/api/documents/${doc.id}/file`} target="_blank" rel="noreferrer">View</a>
-              <a className="font-semibold" href={`/api/documents/${doc.id}/file?download=1`}>Download</a>
+              <DocumentFileLink id={doc.id} name={doc.name} mode="view" className="inline font-semibold">View</DocumentFileLink>
+              <DocumentFileLink id={doc.id} name={doc.name} mode="download" className="inline font-semibold">Download</DocumentFileLink>
               <label className="cursor-pointer font-semibold">
                 Replace
                 <input type="file" accept="application/pdf,image/jpeg,image/png" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadBill(file, doc.id); }} />

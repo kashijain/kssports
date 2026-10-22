@@ -43,13 +43,32 @@ npm run typecheck
 
 | Variable | Purpose |
 | --- | --- |
-| `PORT` | API and built app. Default `47291`. |
+| `PORT` | API and built app. Default `47291`. Render sets this itself. |
 | `MONGODB_URI` | MongoDB connection. |
 | `JWT_SECRET` | Signs the session cookie. Change it before sharing a server. |
-| `SEED_DEMO` | Seeds the KS Sports shop when `true`. |
-| `EXPOSE_RESET_LINK` | Returns the password-reset URL in the app when mail is not configured. Turn this off on a public server. |
-| `CHROME_PATH` | Chrome used to print invoice and catalog PDFs. |
-| `COOKIE_SECURE` | Set `true` only behind HTTPS. |
-| `CLIENT_ORIGIN` | Browser origin allowed to call the API with cookies. |
+| `SEED_DEMO` | Seeds the KS Sports shop when `true`. Ignored when `NODE_ENV=production`. |
+| `EXPOSE_RESET_LINK` | Returns the password-reset URL in the app when mail is not configured. Stays off in production unless set to `true`. |
+| `CHROME_PATH` | Chrome used to print invoice and catalog PDFs. Leave unset when Chrome is not installed. |
+| `COOKIE_SECURE` | Set `true` only behind HTTPS. Production turns this on. |
+| `CLIENT_ORIGIN` | Browser origin allowed to call the API with cookies. Use the exact Vercel origin in production. |
+| `CLOUDINARY_CLOUD_NAME` | Cloudinary cloud name. All three Cloudinary values are required before uploads leave disk. |
+| `CLOUDINARY_API_KEY` | Cloudinary API key. |
+| `CLOUDINARY_API_SECRET` | Cloudinary API secret. |
+| `VITE_API_URL` | Render origin for a production frontend build. Leave empty locally. |
 
-Logos, product photos, and private supplier bills are stored under `uploads/`. Supplier bills sit in a private folder and are not served as public files. Replace the logo from Settings whenever the real mark is ready.
+Logos, product photos, and private supplier bills are stored under `uploads/` when Cloudinary is not configured. With Cloudinary configured, public images go to Cloudinary and private bills stay behind the signed-in document route. Supplier bills are not served as public files.
+
+## Production
+
+The client is a static Vite build. On Vercel, set the project root to `client`, the build command to `npm run build`, and the output directory to `dist`. `client/vercel.json` sends routes such as `/login` and `/products` back to `index.html`.
+
+Set `VITE_API_URL` on Vercel to the Render origin, with no trailing slash. Do not set it for local development. The Vite dev server keeps proxying `/api` to the local API.
+
+Render runs the API from the repository root:
+
+```bash
+npm install && npm run build -w server
+npm start
+```
+
+`npm start` runs `node dist/index.js` and listens on Render's `PORT`. Set `MONGODB_URI`, `JWT_SECRET`, `CLIENT_ORIGIN` (the exact Vercel origin), `COOKIE_SECURE=true`, `SEED_DEMO=false`, `EXPOSE_RESET_LINK=false`, `NODE_ENV=production`, and the three Cloudinary variables. Leave `CHROME_PATH` unset. Invoice and catalog PDFs need Chrome; without it, print from the on-screen preview. Production does not seed demo data.

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useMeta } from '../auth';
+import { AuthenticatedHtmlFrame } from '../components/AuthenticatedHtmlFrame';
 import { InvoiceActions } from '../components/InvoiceActions';
 import { Badge, Button, Dialog, Field, PageHeader, SelectInput, Spinner, TextArea, TextInput } from '../components/ui';
 import { api } from '../lib/api';
@@ -131,7 +132,7 @@ export function InvoiceView() {
         ) : null}
       </div>
       <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <iframe title={invoice.number} className="min-h-[900px] w-full rounded-3xl border border-line bg-white" src={`/api/invoices/${invoice.id}/html`} />
+        <AuthenticatedHtmlFrame path={`/api/invoices/${invoice.id}/html`} title={invoice.number} className="min-h-[900px] w-full rounded-3xl border border-line bg-white" />
         <aside className="grid gap-3">
           <section className="rounded-3xl border border-line bg-card p-4 text-sm">
             <Row label="Total" value={inr(invoice.totals.grandTotal)} />

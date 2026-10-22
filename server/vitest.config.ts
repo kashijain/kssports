@@ -13,6 +13,9 @@ export default defineConfig({
       EXPOSE_RESET_LINK: 'true',
       SEED_DEMO: 'false',
       COOKIE_SECURE: 'false',
+      CLOUDINARY_CLOUD_NAME: '',
+      CLOUDINARY_API_KEY: '',
+      CLOUDINARY_API_SECRET: '',
     },
   },
 });

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { DocumentFileLink } from '../components/DocumentFileLink';
 import { Button, Dialog, Empty, Field, PageHeader, SelectInput, Spinner, TextInput } from '../components/ui';
 import { api } from '../lib/api';
 import { inr, prettyDate, todayIn } from '../lib/format';
@@ -74,7 +75,7 @@ export function Expenses() {
                   <td>{inr(row.amount)}</td>
                   <td>
                     {(row.documents || []).map((doc) => (
-                      <a key={doc.id} className="mr-2 font-semibold" href={`/api/documents/${doc.id}/file`} target="_blank" rel="noreferrer">{doc.name}</a>
+                      <DocumentFileLink key={doc.id} id={doc.id} name={doc.name} mode="view" className="mr-2 inline font-semibold">{doc.name}</DocumentFileLink>
                     ))}
                   </td>
                 </tr>

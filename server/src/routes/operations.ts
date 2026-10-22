@@ -15,13 +15,13 @@ import {
   Supplier,
 } from '../models.js';
 import { presentInvoiceListItem } from '../present.js';
-import { documentUpload, upload } from '../services/files.js';
+import { discardRejectedUpload, documentUpload, publicAssetUrl, removeUpload, storedPublicImage, upload } from '../services/files.js';
 import { htmlToPdf } from '../services/pdf.js';
 import {
   cancelPurchase,
   catalogProducts,
   createPurchase,
-  documentAbsPath,
+  loadDocument,
   ensureExpenseCategories,
   lineProfit,
   listCategories,
@@ -33,7 +33,6 @@ import {
   saveSupplier,
   storeDocument,
 } from '../services/operations.js';
-import { removeUpload } from '../services/files.js';
 import { escapeRegex, pageQuery } from '../util.js';
 import { parseBody } from '../validate.js';
 
@@ -333,9 +332,10 @@ opsRouter.post(
   asyncHandler(async (req, res) => {
     const machine = await Machine.findOne({ _id: req.params.id, businessId: req.auth!.businessId });
     if (!machine || !req.file) throw new HttpError(400, 'Choose a machine photo.');
-    if (machine.photoPath) await removeUpload(machine.photoPath);
-    machine.photoPath = `${req.auth!.businessId}/${req.file.filename}`;
+    const previous = machine.photoPath || '';
+    machine.photoPath = await storedPublicImage(req.file, req.auth!.businessId!, 'machines');
     await machine.save();
+    if (previous && previous !== machine.photoPath) await removeUpload(previous);
     res.json({ machine: presentMachine(machine) });
   }),
 );
@@ -449,7 +449,7 @@ opsRouter.post(
     const settings = await BusinessSettings.findOne({ businessId: req.auth!.businessId });
     const max = (settings?.documents?.maxUploadMb || 8) * 1024 * 1024;
     if (req.file.size > max) {
-      await removeUpload(`${req.auth!.businessId}/private/${req.file.filename}`);
+      await discardRejectedUpload(req.file, req.auth!.businessId!);
       throw new HttpError(400, `File is larger than ${settings?.documents?.maxUploadMb || 8} MB.`);
     }
     const doc = await storeDocument(req.auth!.businessId!, req.file, moduleName, recordId, req.body?.replaceId);
@@ -460,10 +460,10 @@ opsRouter.post(
 opsRouter.get(
   '/documents/:id/file',
   asyncHandler(async (req, res) => {
-    const { doc, abs } = await documentAbsPath(req.auth!.businessId!, req.params.id);
+    const { doc, body } = await loadDocument(req.auth!.businessId!, req.params.id);
     res.setHeader('Content-Type', doc.mime);
     res.setHeader('Content-Disposition', `${req.query.download === '1' ? 'attachment' : 'inline'}; filename="${doc.originalName}"`);
-    res.sendFile(abs);
+    res.send(body);
   }),
 );
 
@@ -577,7 +577,7 @@ function presentMachine(row: {
     status: row.status,
     location: row.location || '',
     notes: row.notes || '',
-    photoUrl: row.photoPath ? `/uploads/${row.photoPath}` : '',
+    photoUrl: row.photoPath ? publicAssetUrl(row.photoPath) : '',
   };
 }
 

@@ -1,13 +1,15 @@
 import { Link, useParams } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { Button, Spinner } from '../components/ui';
-import { api } from '../lib/api';
+import { api, apiUrl, fetchPublicText } from '../lib/api';
 import { inr } from '../lib/format';
 import type { InvoiceDetail } from '../types';
 
 export function SharePage() {
   const { token = '' } = useParams();
   const [invoice, setInvoice] = useState<InvoiceDetail | null>(null);
+  const [html, setHtml] = useState('');
+  const [htmlError, setHtmlError] = useState(false);
   const [missing, setMissing] = useState(false);
 
   useEffect(() => {
@@ -15,6 +17,23 @@ export function SharePage() {
       .then((data) => setInvoice(data.invoice))
       .catch(() => setMissing(true));
   }, [token]);
+
+  useEffect(() => {
+    if (!invoice) return;
+    let live = true;
+    setHtml('');
+    setHtmlError(false);
+    fetchPublicText(`/api/public/invoices/${token}/html`)
+      .then((text) => {
+        if (live) setHtml(text);
+      })
+      .catch(() => {
+        if (live) setHtmlError(true);
+      });
+    return () => {
+      live = false;
+    };
+  }, [invoice, token]);
 
   if (missing) {
     return (
@@ -45,15 +64,23 @@ export function SharePage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <a href={`/api/public/invoices/${token}/pdf`}>
+          <a href={apiUrl(`/api/public/invoices/${token}/pdf`)}>
             <Button>Download PDF</Button>
           </a>
-          <Button variant="secondary" onClick={() => window.open(`/api/public/invoices/${token}/html?print=1`, '_blank', 'noopener')}>
+          <Button variant="secondary" onClick={() => window.open(apiUrl(`/api/public/invoices/${token}/html?print=1`), '_blank', 'noopener')}>
             Print
           </Button>
         </div>
       </div>
-      <iframe title={invoice.number} className="min-h-[900px] w-full rounded-3xl border border-line bg-white" src={`/api/public/invoices/${token}/html`} />
+      {html ? (
+        <iframe title={invoice.number} className="min-h-[900px] w-full rounded-3xl border border-line bg-white" srcDoc={html} />
+      ) : htmlError ? (
+        <p className="rounded-3xl border border-line bg-card p-6 text-sm">The invoice preview could not be loaded. You can still print it or download the PDF.</p>
+      ) : (
+        <div className="grid min-h-[320px] place-items-center">
+          <Spinner />
+        </div>
+      )}
       <p className="mt-4 text-center text-xs text-muted">
         Shared from a KS Sports account. <Link to="/login">Sign in</Link>
       </p>

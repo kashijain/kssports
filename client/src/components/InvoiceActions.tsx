@@ -1,8 +1,7 @@
 import { Download, Eye, Pencil, Printer, Share2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { downloadFile } from '../lib/api';
-import { api } from '../lib/api';
+import { api, downloadFile, openAuthenticated } from '../lib/api';
 import { fail } from '../lib/toast';
 import type { InvoiceDetail } from '../types';
 
@@ -24,7 +23,7 @@ export function InvoiceActions({
       <IconButton label="Download" onClick={() => void downloadPdf(id, number)}>
         <Download size={16} />
       </IconButton>
-      <IconButton label="Print" onClick={() => window.open(`/api/invoices/${id}/html?print=1`, '_blank', 'noopener')}>
+      <IconButton label="Print" onClick={() => void openAuthenticated(`/api/invoices/${id}/html?print=1`).catch(fail)}>
         <Printer size={16} />
       </IconButton>
       <IconButton label="Share" onClick={() => void share(id, status, number)}>

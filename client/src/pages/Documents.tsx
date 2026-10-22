@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { DocumentFileLink } from '../components/DocumentFileLink';
 import { Empty, PageHeader, SelectInput, Spinner, TextInput } from '../components/ui';
 import { api } from '../lib/api';
 import { prettyDate } from '../lib/format';
@@ -81,8 +82,8 @@ export function DocumentsPage() {
                   <td>{prettyDate(row.uploadedAt?.slice(0, 10))}</td>
                   <td>{(row.size / 1024).toFixed(0)} KB</td>
                   <td className="space-x-3">
-                    <a href={`/api/documents/${row.id}/file`} target="_blank" rel="noreferrer">Preview</a>
-                    <a href={`/api/documents/${row.id}/file?download=1`}>Download</a>
+                    <DocumentFileLink id={row.id} name={row.name} mode="view" className="inline">Preview</DocumentFileLink>
+                    <DocumentFileLink id={row.id} name={row.name} mode="download" className="inline">Download</DocumentFileLink>
                     <button type="button" className="text-clay-dark" onClick={() => { if (window.confirm('Delete this file?')) void api(`/api/documents/${row.id}`, { method: 'DELETE' }).then(load).catch(fail); }}>Delete</button>
                   </td>
                 </tr>

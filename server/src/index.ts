@@ -7,6 +7,9 @@ import { seedDemo } from './seed.js';
 fs.mkdirSync(uploadsDir, { recursive: true });
 
 await connect();
+if (config.production && process.env.SEED_DEMO === 'true') {
+  console.warn('SEED_DEMO is ignored when NODE_ENV=production. Demo data is not seeded.');
+}
 if (config.seedDemo) {
   await seedDemo();
 }

@@ -5,6 +5,9 @@ import { HttpError } from '../http.js';
 let browserPromise: Promise<Browser> | null = null;
 
 async function browser(): Promise<Browser> {
+  if (!config.chromePath) {
+    throw new HttpError(503, 'The PDF engine is unavailable. You can still print the invoice from the preview.');
+  }
   if (!browserPromise) {
     browserPromise = puppeteer
       .launch({

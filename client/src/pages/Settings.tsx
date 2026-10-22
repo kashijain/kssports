@@ -354,7 +354,7 @@ export function SettingsPage() {
       {tab === 'look' && defaults ? (
         <form onSubmit={saveLook} className="grid max-w-3xl gap-3 rounded-3xl border border-line bg-card p-4">
           <div className="grid gap-3 sm:grid-cols-2">
-            <ImageField label="Logo" url={business?.logoUrl || '/logo.png'} removable={Boolean(business?.logoUrl?.startsWith('/uploads'))} onFile={(file) => void upload('logo', file)} onClear={() => void clearImage('logo')} disabled={!owner} />
+            <ImageField label="Logo" url={business?.logoUrl || '/logo.png'} removable={Boolean(business?.logoUrl && business.logoUrl !== '/logo.png' && (business.logoUrl.startsWith('/uploads/') || business.logoUrl.includes('res.cloudinary.com')))} onFile={(file) => void upload('logo', file)} onClear={() => void clearImage('logo')} disabled={!owner} />
             <ImageField label="Signature" url={business?.signatureUrl || ''} onFile={(file) => void upload('signature', file)} onClear={() => void clearImage('signature')} disabled={!owner} />
           </div>
           <Field label="Template">

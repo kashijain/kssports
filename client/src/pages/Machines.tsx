@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { toast } from 'sonner';
+import { DocumentFileLink } from '../components/DocumentFileLink';
 import { Button, Dialog, Empty, Field, PageHeader, SelectInput, Spinner, TextArea, TextInput } from '../components/ui';
 import { api } from '../lib/api';
 import { inr, prettyDate } from '../lib/format';
@@ -116,8 +117,8 @@ export function Machines() {
             <li key={doc.id} className="flex flex-wrap gap-3 border-t border-line py-2">
               <span>{doc.name}</span>
               <span className="text-muted">{doc.fileType} · {(doc.size / 1024).toFixed(0)} KB</span>
-              <a href={`/api/documents/${doc.id}/file`} target="_blank" rel="noreferrer">View</a>
-              <a href={`/api/documents/${doc.id}/file?download=1`}>Download</a>
+              <DocumentFileLink id={doc.id} name={doc.name} mode="view">View</DocumentFileLink>
+              <DocumentFileLink id={doc.id} name={doc.name} mode="download">Download</DocumentFileLink>
             </li>
           ))}
         </ul>
@@ -136,7 +137,7 @@ export function Machines() {
             <li key={item.id} className="border-t border-line py-2">
               {prettyDate(item.date)} · {item.maintenanceType} · {item.vendor || 'No vendor'} · {inr(item.cost)}{item.nextDate ? ` · next ${prettyDate(item.nextDate)}` : ''}
               {(item.documents || []).map((doc) => (
-                <a key={doc.id} className="ml-3 font-semibold" href={`/api/documents/${doc.id}/file`} target="_blank" rel="noreferrer">{doc.name}</a>
+                <DocumentFileLink key={doc.id} id={doc.id} name={doc.name} mode="view" className="ml-3 inline font-semibold">{doc.name}</DocumentFileLink>
               ))}
             </li>
           ))}

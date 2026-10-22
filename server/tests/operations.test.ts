@@ -1,11 +1,14 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import mongoose from 'mongoose';
 import { createApp } from '../src/app.js';
-import { config } from '../src/config.js';
+import { config, uploadsDir } from '../src/config.js';
 import { connect, disconnect } from '../src/db.js';
 import { gstinCheckCharacter } from '../src/domain/gstin.js';
 import { Product, StockMovement } from '../src/models.js';
+import { cloudinaryEnabled, publicAssetUrl } from '../src/services/files.js';
 
 const app = createApp();
 const gstin = (state: string, pan: string) => `${state}${pan}1Z${gstinCheckCharacter(`${state}${pan}1Z`)}`;
@@ -187,5 +190,69 @@ describe('KS Sports operations', () => {
     const dash = await agent.get('/api/reports/dashboard');
     expect(dash.body.stats.machines).toBe(1);
     expect(dash.body.stats.maintenanceDue).toBe(2);
+  });
+
+  it('keeps uploads on disk when Cloudinary is not configured', async () => {
+    expect(cloudinaryEnabled()).toBe(false);
+    expect(publicAssetUrl('shop/photo.jpg')).toBe('/uploads/shop/photo.jpg');
+    expect(publicAssetUrl('cldraw:kssports/shop/documents/bill')).toBe('');
+    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+    const agent = await shop();
+    const product = await agent.post('/api/products').send({ name: 'Photo Bat', sellingPrice: 1000, gstRate: 0, unit: 'pcs' });
+    expect(product.status).toBe(201);
+    const productId = product.body.product.id;
+    const image = await agent.post(`/api/products/${productId}/images`).attach('file', png, { filename: 'bat.png', contentType: 'image/png' });
+    expect(image.status, JSON.stringify(image.body)).toBe(201);
+    expect(image.body.product.images[0].url).toMatch(/^\/uploads\//);
+    const saved = await Product.findById(productId);
+    const relative = saved!.images[0].path || '';
+    expect(relative.startsWith('cld')).toBe(false);
+    expect(fs.existsSync(path.join(uploadsDir, relative))).toBe(true);
+    const preview = await agent.post('/api/catalog/preview').send({ ids: productId });
+    expect(preview.status).toBe(200);
+    expect(preview.text).toContain('data:image/png;base64,');
+    const pdf = await agent.get(`/api/catalog/pdf?ids=${productId}`).buffer(true);
+    expect(pdf.status).toBe(200);
+    expect(pdf.body.subarray(0, 4).toString()).toBe('%PDF');
+    const removed = await agent.delete(`/api/products/${productId}/images/${image.body.product.images[0].id}`);
+    expect(removed.status).toBe(200);
+    expect(removed.body.product.images).toHaveLength(0);
+    expect(fs.existsSync(path.join(uploadsDir, relative))).toBe(false);
+
+    const logo = await agent.post('/api/business/logo').attach('file', png, { filename: 'logo.png', contentType: 'image/png' });
+    expect(logo.status, JSON.stringify(logo.body)).toBe(200);
+    expect(logo.body.business.logoUrl).toMatch(/^\/uploads\//);
+    const signature = await agent.post('/api/business/signature').attach('file', png, { filename: 'sign.png', contentType: 'image/png' });
+    expect(signature.status).toBe(200);
+    expect(signature.body.business.signatureUrl).toMatch(/^\/uploads\//);
+    const cleared = await agent.delete('/api/business/logo');
+    expect(cleared.status).toBe(200);
+    expect(cleared.body.business.logoUrl).toBe('/logo.png');
+
+    const machine = await agent.post('/api/machines').send({ name: 'Photo press', machineType: 'Press', status: 'active' });
+    const photo = await agent.post(`/api/machines/${machine.body.machine.id}/photo`).attach('file', png, { filename: 'press.png', contentType: 'image/png' });
+    expect(photo.status, JSON.stringify(photo.body)).toBe(200);
+    expect(photo.body.machine.photoUrl).toMatch(/^\/uploads\//);
+
+    const purchase = await agent.post('/api/purchases').send({
+      supplier: { name: 'ABC Sports Pvt Ltd', stateCode: '08' },
+      supplierInvoice: 'ABC-2026-2001',
+      purchaseDate: '2026-10-22',
+      status: 'unpaid',
+      items: [{ name: 'Photo Bat', quantity: 1, purchasePrice: 500, gstRate: 0 }],
+    });
+    const bill = await agent
+      .post(`/api/purchases/${purchase.body.purchase.id}/bill`)
+      .attach('file', Buffer.from('%PDF-1.4\n%%EOF'), { filename: 'supplier-bill.pdf', contentType: 'application/pdf' });
+    expect(bill.status, JSON.stringify(bill.body)).toBe(201);
+    const downloaded = await agent.get(`/api/documents/${bill.body.document.id}/file`).buffer(true);
+    expect(downloaded.status).toBe(200);
+    expect(downloaded.headers['content-type']).toContain('pdf');
+    expect(downloaded.body.toString()).toContain('%PDF-1.4');
+    expect(JSON.stringify(downloaded.headers)).not.toContain('cloudinary');
+    const deleted = await agent.delete(`/api/documents/${bill.body.document.id}`);
+    expect(deleted.status).toBe(200);
+    const missing = await agent.get(`/api/documents/${bill.body.document.id}/file`);
+    expect(missing.status).toBe(404);
   });
 });

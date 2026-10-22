@@ -7,7 +7,7 @@ import { customerSchema, productSchema } from '../schemas.js';
 import { saveCustomer, saveProduct } from '../services/catalog.js';
 import { productActivity } from '../services/operations.js';
 import { commitStock } from '../services/stock.js';
-import { upload, removeUpload } from '../services/files.js';
+import { upload, removeUpload, storedPublicImage } from '../services/files.js';
 import { todayKey } from '../domain/dates.js';
 import { escapeRegex, pageQuery } from '../util.js';
 import { parseBody } from '../validate.js';
@@ -152,7 +152,7 @@ productRouter.post(
     const product = await Product.findOne({ _id: req.params.id, businessId: req.auth!.businessId });
     if (!product) throw new HttpError(404, 'Product not found.');
     if (!req.file) throw new HttpError(400, 'Choose an image.');
-    const relative = `${req.auth!.businessId}/${req.file.filename}`;
+    const relative = await storedPublicImage(req.file, req.auth!.businessId!, 'products');
     product.images.push({ path: relative, alt: product.name });
     await product.save();
     res.status(201).json({ product: presentProduct(product) });

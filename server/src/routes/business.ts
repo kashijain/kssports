@@ -1,4 +1,3 @@
-import path from 'node:path';
 import { Router, type Request } from 'express';
 import { PAYMENT_METHODS, TEMPLATES, UNITS, INVOICE_STATUSES } from '../domain/constants.js';
 import { STATES } from '../domain/states.js';
@@ -8,7 +7,7 @@ import { Business, BusinessSettings, Product, TaxRate } from '../models.js';
 import { presentBusiness, presentSettings, presentTaxRate } from '../present.js';
 import { businessSchema, settingsSchema, taxRatePatchSchema, taxRateSchema } from '../schemas.js';
 import { saveBusiness, saveSettings } from '../services/catalog.js';
-import { removeUpload, upload } from '../services/files.js';
+import { removeUpload, storedPublicImage, upload } from '../services/files.js';
 import { peekNextNumber } from '../services/numbering.js';
 import { todayKey } from '../domain/dates.js';
 import { roundRate } from '../domain/money.js';
@@ -36,7 +35,7 @@ async function replaceImage(req: Request, kind: 'logo' | 'signature') {
   if (!business) throw new HttpError(404, 'Business profile not found.');
   const file = req.file;
   if (!file) throw new HttpError(400, 'Choose an image to upload.');
-  const relative = path.posix.join(req.auth!.businessId!, path.basename(file.filename));
+  const relative = await storedPublicImage(file, req.auth!.businessId!, 'brand');
   const previous = kind === 'logo' ? business.logoPath : business.signaturePath;
   if (kind === 'logo') business.logoPath = relative;
   else business.signaturePath = relative;

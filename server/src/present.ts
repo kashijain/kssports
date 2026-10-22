@@ -1,3 +1,4 @@
+import { publicAssetUrl } from './services/files.js';
 import { amountInWords } from './domain/words.js';
 import { methodLabel, statusLabel } from './domain/constants.js';
 import { fromPaise, toPaise } from './domain/money.js';
@@ -27,8 +28,8 @@ export function presentBusiness(business: Loose) {
     state: business.state || '',
     stateCode: business.stateCode || '',
     pincode: business.pincode || '',
-    logoUrl: business.logoPath ? `/uploads/${business.logoPath}` : '/logo.png',
-    signatureUrl: business.signaturePath ? `/uploads/${business.signaturePath}` : '',
+    logoUrl: business.logoPath ? publicAssetUrl(business.logoPath) || '/logo.png' : '/logo.png',
+    signatureUrl: business.signaturePath ? publicAssetUrl(business.signaturePath) : '',
     bank: business.bank?.bankName ? business.bank : null,
     upiId: business.upiId || '',
     gstEnabled: Boolean(business.gstin),
@@ -106,7 +107,7 @@ export function presentProduct(product: Loose) {
     specifications: (product.specifications || []).map((row: Loose) => ({ label: row.label || '', value: row.value || '' })),
     images: (product.images || []).map((image: Loose) => ({
       id: String(image._id),
-      url: image.path ? `/uploads/${image.path}` : '',
+      url: image.path ? publicAssetUrl(image.path) : '',
       alt: image.alt || '',
     })),
     status: product.status || 'active',

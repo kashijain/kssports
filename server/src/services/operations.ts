@@ -1,5 +1,3 @@
-import fs from 'node:fs';
-import path from 'node:path';
 import { calculateInvoice } from '../domain/gst.js';
 import { todayKey } from '../domain/dates.js';
 import { validateGstin } from '../domain/gstin.js';
@@ -21,8 +19,7 @@ import {
   StockMovement,
   Supplier,
 } from '../models.js';
-import { uploadsDir } from '../config.js';
-import { brandLogoDataUrl, readDataUrl, removeUpload } from './files.js';
+import { brandLogoDataUrl, readDataUrl, readStoredBytes, removeUpload, storedPrivateFile } from './files.js';
 import { commitStock } from './stock.js';
 import { isDuplicate } from '../util.js';
 
@@ -263,17 +260,21 @@ export async function ensureExpenseCategories(businessId: string) {
 }
 
 export async function storeDocument(businessId: string, file: Express.Multer.File, module: string, recordId: string, replaceId?: string) {
-  const relative = path.posix.join(businessId, 'private', path.basename(file.filename));
+  const relative = await storedPrivateFile(file, businessId);
   if (replaceId) {
     const previous = await DocumentFile.findOne({ _id: replaceId, businessId, recordId });
-    if (!previous) throw new HttpError(404, 'Document not found.');
-    await removeUpload(previous.path);
+    if (!previous) {
+      await removeUpload(relative);
+      throw new HttpError(404, 'Document not found.');
+    }
+    const oldPath = previous.path;
     previous.name = file.originalname;
     previous.originalName = file.originalname;
     previous.mime = file.mimetype;
     previous.size = file.size;
     previous.path = relative;
     await previous.save();
+    if (oldPath && oldPath !== relative) await removeUpload(oldPath);
     return previous;
   }
   return DocumentFile.create({
@@ -288,12 +289,11 @@ export async function storeDocument(businessId: string, file: Express.Multer.Fil
   });
 }
 
-export async function documentAbsPath(businessId: string, id: string) {
+export async function loadDocument(businessId: string, id: string) {
   const doc = await DocumentFile.findOne({ _id: id, businessId });
   if (!doc) throw new HttpError(404, 'Document not found.');
-  const abs = path.join(uploadsDir, doc.path);
-  if (!abs.startsWith(uploadsDir) || !fs.existsSync(abs)) throw new HttpError(404, 'File is missing.');
-  return { doc, abs };
+  const body = await readStoredBytes(doc.path);
+  return { doc, body };
 }
 
 export function presentDocument(doc: { _id: unknown; name: string; mime: string; size: number; module: string; recordId: unknown; createdAt?: Date; originalName?: string }) {
