@@ -87,6 +87,23 @@ const settingsSchema = new Schema(
       signatory: { type: String, default: '' },
       lowStockThreshold: { type: Number, default: 5 },
     },
+    inventory: {
+      allowNegativeStock: { type: Boolean, default: false },
+      lowStockThreshold: { type: Number, default: 5 },
+      valuation: { type: String, enum: ['purchase', 'average', 'retail'], default: 'purchase' },
+    },
+    catalog: {
+      showRetail: { type: Boolean, default: true },
+      showWholesale: { type: Boolean, default: true },
+      showGst: { type: Boolean, default: false },
+      layout: { type: String, enum: ['grid', 'list'], default: 'grid' },
+      perPage: { type: Number, default: 6 },
+    },
+    documents: {
+      maxUploadMb: { type: Number, default: 8 },
+      allowedTypes: { type: [String], default: ['pdf', 'jpg', 'jpeg', 'png'] },
+    },
+    purchaseNext: { type: Number, default: 1 },
   },
   { timestamps: true },
 );
@@ -126,13 +143,23 @@ const productSchema = new Schema(
     sku: { type: String, default: '' },
     hsnSac: { type: String, default: '' },
     category: { type: String, default: '' },
+    subCategory: { type: String, default: '' },
+    brand: { type: String, default: '' },
     unit: { type: String, default: 'pcs' },
     sellingPrice: { type: Number, required: true },
+    purchasePrice: { type: Number, default: null },
+    wholesalePrice: { type: Number, default: null },
     gstRate: { type: Number, default: 0 },
     trackStock: { type: Boolean, default: false },
     stockQuantity: { type: Number, default: null },
     lowStockThreshold: { type: Number, default: 5 },
     description: { type: String, default: '' },
+    specifications: { type: [{ label: String, value: String }], default: [] },
+    images: {
+      type: [{ path: String, alt: { type: String, default: '' } }],
+      default: [],
+    },
+    status: { type: String, enum: ['active', 'inactive'], default: 'active' },
     archived: { type: Boolean, default: false },
   },
   { timestamps: true },
@@ -164,6 +191,7 @@ const invoiceItemSchema = new Schema(
     igst: { type: Number, default: 0 },
     taxAmount: { type: Number, default: 0 },
     total: { type: Number, default: 0 },
+    unitCost: { type: Number, default: null },
   },
   { _id: true },
 );
@@ -271,6 +299,182 @@ const paymentSchema = new Schema(
   { timestamps: true },
 );
 
+const categorySchema = new Schema(
+  {
+    businessId: { type: Schema.Types.ObjectId, ref: 'Business', required: true, index: true },
+    name: { type: String, required: true },
+    parentId: { type: Schema.Types.ObjectId, ref: 'Category', default: null },
+  },
+  { timestamps: true },
+);
+categorySchema.index({ businessId: 1, name: 1, parentId: 1 }, { unique: true });
+
+const supplierSchema = new Schema(
+  {
+    businessId: { type: Schema.Types.ObjectId, ref: 'Business', required: true, index: true },
+    name: { type: String, required: true },
+    company: { type: String, default: '' },
+    mobile: { type: String, default: '' },
+    email: { type: String, default: '' },
+    address: { type: addressSchema, default: () => ({}) },
+    gstin: { type: String, default: '' },
+    state: { type: String, default: '' },
+    stateCode: { type: String, default: '' },
+    archived: { type: Boolean, default: false },
+  },
+  { timestamps: true },
+);
+
+const purchaseItemSchema = new Schema(
+  {
+    productId: { type: Schema.Types.ObjectId, ref: 'Product', default: null },
+    name: { type: String, required: true },
+    sku: { type: String, default: '' },
+    quantity: { type: Number, required: true },
+    purchasePrice: { type: Number, required: true },
+    discountMode: { type: String, enum: ['amount', 'percent'], default: 'amount' },
+    discountValue: { type: Number, default: 0 },
+    discountAmount: { type: Number, default: 0 },
+    taxableAmount: { type: Number, default: 0 },
+    gstRate: { type: Number, default: 0 },
+    cgst: { type: Number, default: 0 },
+    sgst: { type: Number, default: 0 },
+    igst: { type: Number, default: 0 },
+    total: { type: Number, default: 0 },
+  },
+  { _id: true },
+);
+
+const purchaseSchema = new Schema(
+  {
+    businessId: { type: Schema.Types.ObjectId, ref: 'Business', required: true, index: true },
+    number: { type: String, required: true },
+    supplierId: { type: Schema.Types.ObjectId, ref: 'Supplier', default: null },
+    supplierSnapshot: { type: Schema.Types.Mixed, required: true },
+    supplierInvoice: { type: String, default: '' },
+    purchaseDateKey: { type: String, required: true, index: true },
+    dueDateKey: { type: String, default: '' },
+    status: { type: String, enum: ['unpaid', 'partial', 'paid', 'cancelled'], default: 'unpaid' },
+    paymentMethod: { type: String, default: 'bank_transfer' },
+    placeOfSupply: { state: String, stateCode: String },
+    supplyType: { type: String, enum: ['intra', 'inter', 'non_gst'], default: 'non_gst' },
+    items: { type: [purchaseItemSchema], default: [] },
+    totals: { type: Schema.Types.Mixed, default: () => ({}) },
+    amountPaid: { type: Number, default: 0 },
+    amountDue: { type: Number, default: 0 },
+    notes: { type: String, default: '' },
+    payments: {
+      type: [
+        {
+          amount: Number,
+          method: String,
+          reference: { type: String, default: '' },
+          paidAtKey: String,
+          notes: { type: String, default: '' },
+        },
+      ],
+      default: [],
+    },
+  },
+  { timestamps: true },
+);
+purchaseSchema.index({ businessId: 1, number: 1 }, { unique: true });
+
+const stockMovementSchema = new Schema(
+  {
+    businessId: { type: Schema.Types.ObjectId, ref: 'Business', required: true, index: true },
+    productId: { type: Schema.Types.ObjectId, ref: 'Product', required: true, index: true },
+    type: { type: String, enum: ['purchase', 'sale', 'sale_reversal', 'adjustment', 'opening'], required: true },
+    reference: { type: String, default: '' },
+    dateKey: { type: String, required: true },
+    qtyIn: { type: Number, default: 0 },
+    qtyOut: { type: Number, default: 0 },
+    balance: { type: Number, required: true },
+    note: { type: String, default: '' },
+  },
+  { timestamps: true },
+);
+
+const machineSchema = new Schema(
+  {
+    businessId: { type: Schema.Types.ObjectId, ref: 'Business', required: true, index: true },
+    name: { type: String, required: true },
+    machineType: { type: String, default: '' },
+    machineCode: { type: String, default: '' },
+    brand: { type: String, default: '' },
+    model: { type: String, default: '' },
+    serialNumber: { type: String, default: '' },
+    purchaseDateKey: { type: String, default: '' },
+    purchasePrice: { type: Number, default: 0 },
+    supplierName: { type: String, default: '' },
+    warrantyStart: { type: String, default: '' },
+    warrantyEnd: { type: String, default: '' },
+    installationDate: { type: String, default: '' },
+    status: { type: String, enum: ['active', 'maintenance', 'inactive', 'sold'], default: 'active' },
+    location: { type: String, default: '' },
+    photoPath: { type: String, default: '' },
+    notes: { type: String, default: '' },
+    archived: { type: Boolean, default: false },
+  },
+  { timestamps: true },
+);
+
+const maintenanceSchema = new Schema(
+  {
+    businessId: { type: Schema.Types.ObjectId, ref: 'Business', required: true, index: true },
+    machineId: { type: Schema.Types.ObjectId, ref: 'Machine', required: true, index: true },
+    dateKey: { type: String, required: true },
+    maintenanceType: { type: String, required: true },
+    vendor: { type: String, default: '' },
+    cost: { type: Number, default: 0 },
+    description: { type: String, default: '' },
+    nextDateKey: { type: String, default: '' },
+  },
+  { timestamps: true },
+);
+
+const expenseCategorySchema = new Schema(
+  {
+    businessId: { type: Schema.Types.ObjectId, ref: 'Business', required: true, index: true },
+    name: { type: String, required: true },
+  },
+  { timestamps: true },
+);
+expenseCategorySchema.index({ businessId: 1, name: 1 }, { unique: true });
+
+const expenseSchema = new Schema(
+  {
+    businessId: { type: Schema.Types.ObjectId, ref: 'Business', required: true, index: true },
+    name: { type: String, required: true },
+    category: { type: String, required: true },
+    amount: { type: Number, required: true },
+    dateKey: { type: String, required: true, index: true },
+    method: { type: String, default: 'cash' },
+    vendor: { type: String, default: '' },
+    notes: { type: String, default: '' },
+    archived: { type: Boolean, default: false },
+  },
+  { timestamps: true },
+);
+
+const documentSchema = new Schema(
+  {
+    businessId: { type: Schema.Types.ObjectId, ref: 'Business', required: true, index: true },
+    name: { type: String, required: true },
+    originalName: { type: String, required: true },
+    mime: { type: String, required: true },
+    size: { type: Number, required: true },
+    path: { type: String, required: true },
+    module: {
+      type: String,
+      enum: ['purchase', 'machine', 'maintenance', 'expense', 'customer', 'product', 'business'],
+      required: true,
+    },
+    recordId: { type: Schema.Types.ObjectId, required: true, index: true },
+  },
+  { timestamps: true },
+);
+
 export const User = mongoose.model('User', userSchema);
 export const Business = mongoose.model('Business', businessSchema);
 export const BusinessSettings = mongoose.model('BusinessSettings', settingsSchema);
@@ -279,6 +483,15 @@ export const Customer = mongoose.model('Customer', customerSchema);
 export const Product = mongoose.model('Product', productSchema);
 export const Invoice = mongoose.model('Invoice', invoiceSchema);
 export const Payment = mongoose.model('Payment', paymentSchema);
+export const Category = mongoose.model('Category', categorySchema);
+export const Supplier = mongoose.model('Supplier', supplierSchema);
+export const Purchase = mongoose.model('Purchase', purchaseSchema);
+export const StockMovement = mongoose.model('StockMovement', stockMovementSchema);
+export const Machine = mongoose.model('Machine', machineSchema);
+export const MachineMaintenance = mongoose.model('MachineMaintenance', maintenanceSchema);
+export const ExpenseCategory = mongoose.model('ExpenseCategory', expenseCategorySchema);
+export const Expense = mongoose.model('Expense', expenseSchema);
+export const DocumentFile = mongoose.model('DocumentFile', documentSchema);
 
 export type UserDoc = InferSchemaType<typeof userSchema> & { _id: mongoose.Types.ObjectId };
 export type BusinessDoc = InferSchemaType<typeof businessSchema> & { _id: mongoose.Types.ObjectId };

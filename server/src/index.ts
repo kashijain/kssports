@@ -15,5 +15,5 @@ if (config.jwtSecret === 'dev-only-change-me') {
 }
 const app = createApp();
 app.listen(config.port, '0.0.0.0', () => {
-  console.log(`Lekha is running at http://127.0.0.1:${config.port}`);
+  console.log(`KS Sports is running at http://127.0.0.1:${config.port}`);
 });

@@ -22,6 +22,34 @@ export async function removeUpload(relativePath: string): Promise<void> {
   await fs.promises.rm(path.join(uploadsDir, relativePath), { force: true });
 }
 
+export const documentUpload = multer({
+  storage: multer.diskStorage({
+    destination(req, _file, cb) {
+      const businessId = req.auth?.businessId;
+      if (!businessId) {
+        cb(new HttpError(409, 'Add your business profile to continue.'), '');
+        return;
+      }
+      const dir = path.join(uploadsDir, businessId, 'private');
+      fs.mkdirSync(dir, { recursive: true });
+      cb(null, dir);
+    },
+    filename(_req, file, cb) {
+      const ext = path.extname(file.originalname).toLowerCase().replace(/[^.a-z0-9]/g, '') || '.bin';
+      cb(null, `${Date.now()}-${Math.random().toString(16).slice(2, 10)}${ext}`);
+    },
+  }),
+  limits: { fileSize: 8 * 1024 * 1024 },
+  fileFilter(_req, file, cb) {
+    const ok = ['application/pdf', 'image/jpeg', 'image/png'].includes(file.mimetype);
+    if (!ok) {
+      cb(new HttpError(400, 'Upload a PDF, JPG, or PNG.'));
+      return;
+    }
+    cb(null, true);
+  },
+});
+
 export const upload = multer({
   storage: multer.diskStorage({
     destination(req, _file, cb) {

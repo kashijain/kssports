@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuth, useMeta } from '../auth';
 import { Button, Dialog, Empty, Field, PageHeader, SelectInput, Spinner, TextArea, TextInput } from '../components/ui';
@@ -12,13 +13,18 @@ interface Draft {
   sku: string;
   hsnSac: string;
   category: string;
+  subCategory: string;
+  brand: string;
   unit: string;
   sellingPrice: string;
+  purchasePrice: string;
+  wholesalePrice: string;
   gstRate: string;
   trackStock: boolean;
   stockQuantity: string;
   lowStockThreshold: string;
   description: string;
+  status: 'active' | 'inactive';
 }
 
 function emptyDraft(rate = '0'): Draft {
@@ -27,13 +33,18 @@ function emptyDraft(rate = '0'): Draft {
     sku: '',
     hsnSac: '',
     category: '',
+    subCategory: '',
+    brand: 'KS Sports',
     unit: 'pcs',
     sellingPrice: '',
+    purchasePrice: '',
+    wholesalePrice: '',
     gstRate: rate,
     trackStock: false,
     stockQuantity: '',
     lowStockThreshold: '5',
     description: '',
+    status: 'active',
   };
 }
 
@@ -86,13 +97,18 @@ export function Products() {
       sku: product.sku,
       hsnSac: product.hsnSac,
       category: product.category,
+      subCategory: product.subCategory || '',
+      brand: product.brand || '',
       unit: product.unit,
       sellingPrice: String(product.sellingPrice),
+      purchasePrice: product.purchasePrice == null ? '' : String(product.purchasePrice),
+      wholesalePrice: product.wholesalePrice == null ? '' : String(product.wholesalePrice),
       gstRate: String(product.gstRate),
       trackStock: product.trackStock,
       stockQuantity: product.stockQuantity === null ? '' : String(product.stockQuantity),
       lowStockThreshold: String(product.lowStockThreshold),
       description: product.description,
+      status: product.status || 'active',
     });
     setOpen(true);
   }
@@ -106,9 +122,14 @@ export function Products() {
         sku: draft.sku,
         hsnSac: draft.hsnSac,
         category: draft.category,
+        subCategory: draft.subCategory,
+        brand: draft.brand,
         unit: draft.unit,
         sellingPrice: Number(draft.sellingPrice),
+        purchasePrice: draft.purchasePrice === '' ? null : Number(draft.purchasePrice),
+        wholesalePrice: draft.wholesalePrice === '' ? null : Number(draft.wholesalePrice),
         gstRate: business?.gstEnabled ? Number(draft.gstRate) : 0,
+        status: draft.status,
         trackStock: draft.trackStock,
         stockQuantity: draft.trackStock ? Number(draft.stockQuantity || 0) : null,
         lowStockThreshold: Number(draft.lowStockThreshold || settings?.defaults.lowStockThreshold || 5),
@@ -167,7 +188,7 @@ export function Products() {
               {rows.map((product) => (
                 <tr key={product.id} className="border-t border-line">
                   <td className="px-4 py-3">
-                    <p className="font-semibold">{product.name}</p>
+                    <Link to={`/products/${product.id}`} className="font-semibold">{product.name}</Link>
                     <p className="text-xs text-muted">{[product.sku, product.category, product.unit].filter(Boolean).join(' · ')}</p>
                   </td>
                   <td>{product.hsnSac || '—'}</td>
@@ -212,6 +233,24 @@ export function Products() {
           </Field>
           <Field label="Category">
             <TextInput value={draft.category} onChange={(event) => setDraft({ ...draft, category: event.target.value })} />
+          </Field>
+          <Field label="Sub-category">
+            <TextInput value={draft.subCategory} onChange={(event) => setDraft({ ...draft, subCategory: event.target.value })} />
+          </Field>
+          <Field label="Brand">
+            <TextInput value={draft.brand} onChange={(event) => setDraft({ ...draft, brand: event.target.value })} />
+          </Field>
+          <Field label="Purchase price">
+            <TextInput inputMode="decimal" value={draft.purchasePrice} onChange={(event) => setDraft({ ...draft, purchasePrice: event.target.value })} />
+          </Field>
+          <Field label="Wholesale price">
+            <TextInput inputMode="decimal" value={draft.wholesalePrice} onChange={(event) => setDraft({ ...draft, wholesalePrice: event.target.value })} />
+          </Field>
+          <Field label="Status">
+            <SelectInput value={draft.status} onChange={(event) => setDraft({ ...draft, status: event.target.value as 'active' | 'inactive' })}>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </SelectInput>
           </Field>
           <Field label="Unit">
             <SelectInput value={draft.unit} onChange={(event) => setDraft({ ...draft, unit: event.target.value })}>

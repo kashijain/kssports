@@ -59,7 +59,7 @@ export function Login() {
           </Link>
         </div>
         <p className="rounded-2xl bg-amber px-3 py-2 text-xs text-ink">
-          Try the sample shop with <span className="font-semibold">demo@lekha.test</span> and <span className="font-semibold">Demo@12345</span>.
+          Try the sample business with <span className="font-semibold">demo@kssports.test</span> and <span className="font-semibold">Demo@12345</span>.
         </p>
       </form>
     </AuthFrame>
@@ -156,7 +156,7 @@ export function Forgot() {
         {message ? <p className="text-sm">{message}</p> : null}
         {resetUrl ? (
           <p className="rounded-2xl bg-amber px-3 py-2 text-sm">
-            Mail is not connected on this copy of Lekha. Use this one-hour link:{' '}
+            Mail is not connected on this copy of KS Sports. Use this one-hour link:{' '}
             <Link className="font-semibold underline" to={resetUrl}>
               Reset password
             </Link>
@@ -213,16 +213,17 @@ function AuthFrame({ title, lede, children }: { title: string; lede: string; chi
     <div className="grid min-h-screen md:grid-cols-2">
       <section className="hidden flex-col justify-between bg-sidebar p-10 text-paper md:flex">
         <div>
-          <p className="font-serif text-5xl">Lekha</p>
-          <p className="mt-3 max-w-sm text-paper/70">GST invoices, plain bills, payments, and a clear picture of what the shop sold today.</p>
+          <img src="/mark.svg" alt="" className="h-14 w-14" />
+          <p className="mt-4 font-serif text-5xl">KS Sports</p>
+          <p className="mt-3 max-w-sm text-paper/70">Purchases, stock, retail bills, machines, and the cost of running the workshop.</p>
         </div>
         <p className="max-w-sm text-sm text-paper/60">
-          A GSTIN turns on tax invoices with CGST, SGST, and IGST. Without one, Lekha prints a normal bill and leaves GST off the page.
+          A GSTIN turns on tax invoices with CGST, SGST, and IGST. Without one, KS Sports prints a normal bill and leaves GST off the page.
         </p>
       </section>
       <section className="flex items-center justify-center px-4 py-10">
         <div className="w-full max-w-md">
-          <p className="font-serif text-4xl md:hidden">Lekha</p>
+          <p className="font-serif text-4xl md:hidden">KS Sports</p>
           <h1 className="mt-4 font-serif text-4xl">{title}</h1>
           <p className="mb-6 mt-2 text-sm text-muted">{lede}</p>
           {children}

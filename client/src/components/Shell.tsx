@@ -1,6 +1,8 @@
 import {
   Bell,
-  FileText,
+  BookOpen,
+  Cog,
+  FolderOpen,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -9,6 +11,9 @@ import {
   Receipt,
   Search,
   Settings,
+  ShoppingBag,
+  Store,
+  Truck,
   Users,
   Wallet,
   X,
@@ -22,12 +27,17 @@ import { fail } from '../lib/toast';
 
 const links = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
-  { to: '/invoices/new', label: 'Create Invoice', icon: Plus, end: false },
-  { to: '/invoices', label: 'Invoices', icon: FileText, end: true },
+  { to: '/invoices/new', label: 'Billing / Create Invoice', icon: Plus, end: false },
+  { to: '/sales', label: 'Sales', icon: ShoppingBag, end: false },
   { to: '/customers', label: 'Customers', icon: Users, end: false },
-  { to: '/products', label: 'Products', icon: Package, end: false },
-  { to: '/payments', label: 'Payments', icon: Wallet, end: false },
+  { to: '/products', label: 'Products', icon: Package, end: true },
+  { to: '/catalog', label: 'Product Catalog', icon: BookOpen, end: false },
+  { to: '/purchases', label: 'Wholesale Purchases', icon: Truck, end: false },
+  { to: '/invoices', label: 'Retail Sales', icon: Store, end: true },
+  { to: '/machines', label: 'Machines', icon: Cog, end: false },
+  { to: '/expenses', label: 'Expenses', icon: Wallet, end: false },
   { to: '/reports', label: 'Reports', icon: Receipt, end: false },
+  { to: '/documents', label: 'Documents', icon: FolderOpen, end: false },
   { to: '/settings', label: 'Settings', icon: Settings, end: false },
 ];
 
@@ -215,8 +225,9 @@ export function Shell() {
 function Brand() {
   return (
     <div className="px-5 py-5">
-      <p className="font-serif text-3xl text-white">Lekha</p>
-      <p className="text-xs text-paper/60">Bills for the shop counter</p>
+      <img src="/mark.svg" alt="" className="mb-2 h-10 w-10" />
+      <p className="font-serif text-3xl text-white">KS Sports</p>
+      <p className="text-xs text-paper/60">Business & billing</p>
     </div>
   );
 }

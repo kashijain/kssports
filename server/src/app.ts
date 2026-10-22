@@ -13,6 +13,7 @@ import { authRouter } from './routes/auth.js';
 import { businessRouter, metaRouter, settingsRouter, taxRouter } from './routes/business.js';
 import { customerRouter, productRouter } from './routes/catalog.js';
 import { invoiceRouter, paymentRouter, publicRouter } from './routes/invoices.js';
+import { opsRouter } from './routes/operations.js';
 import { reportRouter } from './routes/reports.js';
 
 export function createApp() {
@@ -44,11 +45,18 @@ export function createApp() {
   app.use('/api/payments', paymentRouter);
   app.use('/api/public', publicRouter);
   app.use('/api/reports', reportRouter);
+  app.use('/api', opsRouter);
   app.use('/api', (_req, res) => {
     res.status(404).json({ error: { message: 'Not found.' } });
   });
 
-  app.use('/uploads', express.static(uploadsDir));
+  app.use('/uploads', (req, res, next) => {
+    if (req.path.includes('/private/')) {
+      res.status(404).json({ error: { message: 'Not found.' } });
+      return;
+    }
+    next();
+  }, express.static(uploadsDir));
   if (fs.existsSync(clientDist)) {
     app.use(express.static(clientDist));
     app.use((req, res, next) => {

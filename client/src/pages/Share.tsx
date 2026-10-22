@@ -19,7 +19,7 @@ export function SharePage() {
   if (missing) {
     return (
       <div className="mx-auto max-w-lg px-4 py-16 text-center">
-        <p className="font-serif text-4xl">Lekha</p>
+        <p className="font-serif text-4xl">KS Sports</p>
         <h1 className="mt-4 font-serif text-3xl">This link is not available</h1>
         <p className="mt-2 text-sm text-muted">The invoice may still be a draft, or the shop may have replaced the link.</p>
       </div>
@@ -37,7 +37,7 @@ export function SharePage() {
     <div className="mx-auto max-w-4xl px-4 py-6">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="font-serif text-3xl">Lekha</p>
+          <p className="font-serif text-3xl">KS Sports</p>
           <h1 className="text-lg font-semibold">{invoice.number}</h1>
           <p className="text-sm text-muted">
             {invoice.customer.name} · {inr(invoice.totals.grandTotal)}
@@ -55,7 +55,7 @@ export function SharePage() {
       </div>
       <iframe title={invoice.number} className="min-h-[900px] w-full rounded-3xl border border-line bg-white" src={`/api/public/invoices/${token}/html`} />
       <p className="mt-4 text-center text-xs text-muted">
-        Shared from the shop’s Lekha account. <Link to="/login">Shop sign in</Link>
+        Shared from a KS Sports account. <Link to="/login">Sign in</Link>
       </p>
     </div>
   );

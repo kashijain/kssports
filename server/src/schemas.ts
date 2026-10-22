@@ -58,13 +58,23 @@ export const productSchema = z.object({
   sku: z.string().trim().max(40).optional().default(''),
   hsnSac: z.string().trim().max(16).optional().default(''),
   category: z.string().trim().max(60).optional().default(''),
+  subCategory: z.string().trim().max(60).optional().default(''),
+  brand: z.string().trim().max(60).optional().default(''),
   unit: z.string().trim().min(1).max(20).optional().default('pcs'),
   sellingPrice: z.number().min(0, 'Price cannot be negative.'),
+  purchasePrice: z.number().min(0).nullable().optional(),
+  wholesalePrice: z.number().min(0).nullable().optional(),
   gstRate: z.number().min(0).max(100),
   trackStock: z.boolean().optional().default(false),
   stockQuantity: z.number().min(0).nullable().optional(),
   lowStockThreshold: z.number().min(0).max(1_000_000).optional(),
-  description: z.string().trim().max(400).optional().default(''),
+  description: z.string().trim().max(800).optional().default(''),
+  specifications: z
+    .array(z.object({ label: z.string().trim().max(40), value: z.string().trim().max(80) }))
+    .max(24)
+    .optional()
+    .default([]),
+  status: z.enum(['active', 'inactive']).optional().default('active'),
 });
 
 export const taxRateSchema = z.object({
@@ -131,6 +141,28 @@ export const settingsSchema = z.object({
       documentTitlePlain: z.string().trim().min(1).max(40),
       signatory: z.string().trim().max(80),
       lowStockThreshold: z.number().int().min(0).max(1_000_000),
+    })
+    .optional(),
+  inventory: z
+    .object({
+      allowNegativeStock: z.boolean(),
+      lowStockThreshold: z.number().min(0).max(1_000_000),
+      valuation: z.enum(['purchase', 'average', 'retail']),
+    })
+    .optional(),
+  catalog: z
+    .object({
+      showRetail: z.boolean(),
+      showWholesale: z.boolean(),
+      showGst: z.boolean(),
+      layout: z.enum(['grid', 'list']),
+      perPage: z.number().int().min(1).max(12),
+    })
+    .optional(),
+  documents: z
+    .object({
+      maxUploadMb: z.number().min(1).max(20),
+      allowedTypes: z.array(z.enum(['pdf', 'jpg', 'jpeg', 'png'])).min(1),
     })
     .optional(),
 });

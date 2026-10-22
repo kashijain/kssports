@@ -100,7 +100,7 @@ export function Setup() {
           </Field>
         </div>
         <p className="text-xs text-muted sm:col-span-2">
-          If the GSTIN and the state or PAN do not match, Lekha will stop you. A GSTIN does not by itself make every bill legally complete — you still choose the rate and HSN/SAC.
+          If the GSTIN and the state or PAN do not match, KS Sports will stop you. A GSTIN does not by itself make every bill legally complete — you still choose the rate and HSN/SAC.
         </p>
         <div className="sm:col-span-2">
           <Button type="submit" disabled={busy}>

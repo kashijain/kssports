@@ -49,6 +49,22 @@ export function presentSettings(settings: Loose) {
       resetEachFinancialYear: settings.invoice.resetEachFinancialYear,
     },
     defaults: settings.defaults,
+    inventory: {
+      allowNegativeStock: Boolean(settings.inventory?.allowNegativeStock),
+      lowStockThreshold: settings.inventory?.lowStockThreshold ?? settings.defaults?.lowStockThreshold ?? 5,
+      valuation: settings.inventory?.valuation || 'purchase',
+    },
+    catalog: {
+      showRetail: settings.catalog?.showRetail !== false,
+      showWholesale: settings.catalog?.showWholesale !== false,
+      showGst: Boolean(settings.catalog?.showGst),
+      layout: settings.catalog?.layout || 'grid',
+      perPage: settings.catalog?.perPage || 6,
+    },
+    documents: {
+      maxUploadMb: settings.documents?.maxUploadMb || 8,
+      allowedTypes: settings.documents?.allowedTypes?.length ? settings.documents.allowedTypes : ['pdf', 'jpg', 'jpeg', 'png'],
+    },
   };
 }
 
@@ -76,13 +92,24 @@ export function presentProduct(product: Loose) {
     sku: product.sku || '',
     hsnSac: product.hsnSac || '',
     category: product.category || '',
+    subCategory: product.subCategory || '',
+    brand: product.brand || '',
     unit: product.unit || 'pcs',
     sellingPrice: product.sellingPrice,
+    purchasePrice: product.purchasePrice ?? null,
+    wholesalePrice: product.wholesalePrice ?? null,
     gstRate: product.gstRate,
     trackStock: Boolean(product.trackStock),
     stockQuantity: product.trackStock ? product.stockQuantity ?? 0 : null,
     lowStockThreshold: product.lowStockThreshold ?? 5,
     description: product.description || '',
+    specifications: (product.specifications || []).map((row: Loose) => ({ label: row.label || '', value: row.value || '' })),
+    images: (product.images || []).map((image: Loose) => ({
+      id: String(image._id),
+      url: image.path ? `/uploads/${image.path}` : '',
+      alt: image.alt || '',
+    })),
+    status: product.status || 'active',
     archived: Boolean(product.archived),
   };
 }

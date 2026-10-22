@@ -67,6 +67,9 @@ export interface Settings {
     signatory: string;
     lowStockThreshold: number;
   };
+  inventory: { allowNegativeStock: boolean; lowStockThreshold: number; valuation: 'purchase' | 'average' | 'retail' };
+  catalog: { showRetail: boolean; showWholesale: boolean; showGst: boolean; layout: 'grid' | 'list'; perPage: number };
+  documents: { maxUploadMb: number; allowedTypes: string[] };
 }
 
 export interface StateRow {
@@ -102,13 +105,20 @@ export interface Product {
   sku: string;
   hsnSac: string;
   category: string;
+  subCategory: string;
+  brand: string;
   unit: string;
   sellingPrice: number;
+  purchasePrice: number | null;
+  wholesalePrice: number | null;
   gstRate: number;
   trackStock: boolean;
   stockQuantity: number | null;
   lowStockThreshold: number;
   description: string;
+  specifications: { label: string; value: string }[];
+  images: { id: string; url: string; alt: string }[];
+  status: 'active' | 'inactive';
 }
 
 export interface TaxRate {

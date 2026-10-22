@@ -103,7 +103,13 @@ export function Empty({ title, body, action }: { title: string; body: string; ac
 }
 
 export function Spinner() {
-  return <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-line border-t-clay" role="status" aria-label="Loading" />;
+  return (
+    <div className="grid justify-items-center gap-3" role="status" aria-label="Loading KS Sports">
+      <img src="/mark.svg" alt="" className="h-10 w-10" />
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-line border-t-clay" />
+      <p className="text-xs font-semibold tracking-wide text-muted">KS Sports</p>
+    </div>
+  );
 }
 
 export function PageHeader({ title, lede, action }: { title: string; lede?: string; action?: React.ReactNode }) {

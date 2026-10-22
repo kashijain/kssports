@@ -3,7 +3,7 @@ import { ISSUED_STATUSES, methodLabel, statusLabel } from '../domain/constants.j
 import { eachDate, parseDateKey, reportPresets, todayKey } from '../domain/dates.js';
 import { DomainError } from '../domain/errors.js';
 import { HttpError } from '../http.js';
-import { BusinessSettings, Customer, Invoice, Payment, Product } from '../models.js';
+import { BusinessSettings, Customer, Expense, Invoice, Machine, MachineMaintenance, Payment, Product, Purchase, StockMovement } from '../models.js';
 import { roundMoney } from '../util.js';
 
 function id(businessId: string) {
@@ -97,6 +97,53 @@ export async function dashboard(businessId: string) {
       })),
   ];
 
+  const purchaseMatch = { businessId: id(businessId), status: { $ne: 'cancelled' } };
+  const [todayPurchases, monthPurchases, supplierDue, expenseRows, machineCount, activeMachines, dueMaintenance, stockUnits] = await Promise.all([
+    Purchase.aggregate([{ $match: { ...purchaseMatch, purchaseDateKey: today } }, { $group: { _id: null, total: { $sum: '$totals.grandTotal' } } }]),
+    Purchase.aggregate([{ $match: { ...purchaseMatch, purchaseDateKey: { $gte: month.from, $lte: month.to } } }, { $group: { _id: null, total: { $sum: '$totals.grandTotal' } } }]),
+    Purchase.aggregate([{ $match: { businessId: id(businessId), status: { $in: ['unpaid', 'partial'] } } }, { $group: { _id: null, total: { $sum: '$amountDue' } } }]),
+    Expense.find({ businessId, archived: { $ne: true }, dateKey: { $gte: month.from, $lte: month.to } }),
+    Machine.countDocuments({ businessId, archived: { $ne: true } }),
+    Machine.countDocuments({ businessId, archived: { $ne: true }, status: 'active' }),
+    MachineMaintenance.find({ businessId, nextDateKey: { $gte: today, $ne: '' } }).sort({ nextDateKey: 1 }).limit(5),
+    Product.aggregate([{ $match: { businessId: id(businessId), archived: { $ne: true }, trackStock: true } }, { $group: { _id: null, qty: { $sum: '$stockQuantity' } } }]),
+  ]);
+  const monthExpenses = roundMoney(expenseRows.reduce((sum, row) => sum + row.amount, 0));
+  const catalog = await Product.find({ businessId, archived: { $ne: true } });
+  const byProduct = new Map(catalog.map((product) => [String(product._id), product]));
+  const tracked = catalog.filter((product) => product.trackStock);
+  const lowStockCount = tracked.filter((product) => (product.stockQuantity ?? 0) > 0 && (product.stockQuantity ?? 0) <= (product.lowStockThreshold ?? 5)).length;
+  const outOfStock = tracked.filter((product) => (product.stockQuantity ?? 0) <= 0).length;
+  const costed = await Invoice.find(base);
+  let estimatedProfit = 0;
+  let profitKnown = false;
+  for (const invoice of costed) {
+    for (const item of invoice.items) {
+      const product = item.productId ? byProduct.get(String(item.productId)) : undefined;
+      const unit = item.unitCost != null ? item.unitCost : product?.purchasePrice;
+      if (unit == null) continue;
+      profitKnown = true;
+      estimatedProfit += (item.taxableAmount || 0) - unit * item.quantity;
+    }
+  }
+  const purchaseChart = await Purchase.aggregate([
+    { $match: { ...purchaseMatch, purchaseDateKey: { $gte: from, $lte: today } } },
+    { $group: { _id: '$purchaseDateKey', total: { $sum: '$totals.grandTotal' } } },
+  ]);
+  const topProducts = await Invoice.aggregate([
+    { $match: base },
+    { $unwind: '$items' },
+    { $group: { _id: '$items.name', total: { $sum: '$items.total' }, quantity: { $sum: '$items.quantity' } } },
+    { $sort: { total: -1 } },
+    { $limit: 5 },
+  ]);
+  const expenseBreakdown = new Map<string, number>();
+  for (const row of expenseRows) expenseBreakdown.set(row.category, (expenseBreakdown.get(row.category) || 0) + row.amount);
+  const movement = await StockMovement.aggregate([
+    { $match: { businessId: id(businessId), dateKey: { $gte: from, $lte: today } } },
+    { $group: { _id: '$dateKey', in: { $sum: '$qtyIn' }, out: { $sum: '$qtyOut' } } },
+  ]);
+
   return {
     stats: {
       totalSales,
@@ -107,7 +154,40 @@ export async function dashboard(businessId: string) {
       pendingInvoices,
       outstanding,
       gstCollected,
+      todayPurchases: roundMoney(todayPurchases[0]?.total ?? 0),
+      monthPurchases: roundMoney(monthPurchases[0]?.total ?? 0),
+      supplierOutstanding: roundMoney(supplierDue[0]?.total ?? 0),
+      productCount,
+      stockUnits: roundMoney(stockUnits[0]?.qty ?? 0),
+      lowStock: lowStockCount,
+      outOfStock,
+      receivables: outstanding,
+      payables: roundMoney(supplierDue[0]?.total ?? 0),
+      expenses: monthExpenses,
+      estimatedProfit: profitKnown ? roundMoney(estimatedProfit - monthExpenses) : null,
+      grossProfit: profitKnown ? roundMoney(estimatedProfit) : null,
+      machines: machineCount,
+      activeMachines,
+      maintenanceDue: dueMaintenance.length,
     },
+    salesVsPurchases: eachDate(from, today).map((date) => ({
+      date,
+      sales: roundMoney(chartRows.find((row) => row._id === date)?.total ?? 0),
+      purchases: roundMoney(purchaseChart.find((row) => row._id === date)?.total ?? 0),
+    })),
+    topProducts: topProducts.map((row) => ({ name: row._id, total: roundMoney(row.total), quantity: roundMoney(row.quantity) })),
+    expenseBreakdown: [...expenseBreakdown.entries()].map(([name, total]) => ({ name, total: roundMoney(total) })),
+    stockMovement: eachDate(from, today).map((date) => ({
+      date,
+      in: roundMoney(movement.find((row) => row._id === date)?.in ?? 0),
+      out: roundMoney(movement.find((row) => row._id === date)?.out ?? 0),
+    })),
+    upcomingMaintenance: await Promise.all(
+      dueMaintenance.map(async (row) => {
+        const machine = await Machine.findById(row.machineId);
+        return { id: String(row._id), machine: machine?.name || 'Machine', date: row.nextDateKey, type: row.maintenanceType, cost: row.cost };
+      }),
+    ),
     chart: series,
     recent: recent.map((invoice) => ({
       id: String(invoice._id),
@@ -276,6 +356,95 @@ export async function outstandingReport(businessId: string, from?: string, to?: 
     due: invoice.amountDue,
   }));
   return { total: roundMoney(rows.reduce((sum, row) => sum + row.due, 0)), rows };
+}
+
+export async function purchaseReport(businessId: string, from?: string, to?: string) {
+  const rows = await Purchase.find({
+    businessId,
+    status: { $ne: 'cancelled' },
+    ...(from || to ? { purchaseDateKey: { ...(from ? { $gte: from } : {}), ...(to ? { $lte: to } : {}) } } : {}),
+  }).sort({ purchaseDateKey: 1 });
+  return {
+    total: roundMoney(rows.reduce((sum, row) => sum + (row.totals?.grandTotal || 0), 0)),
+    rows: rows.map((row) => ({
+      number: row.number,
+      date: row.purchaseDateKey,
+      supplier: row.supplierSnapshot?.name || '',
+      invoice: row.supplierInvoice || '',
+      total: row.totals?.grandTotal || 0,
+      paid: row.amountPaid,
+      due: row.amountDue,
+    })),
+  };
+}
+
+export async function inventoryReport(businessId: string) {
+  const settings = await BusinessSettings.findOne({ businessId });
+  const method = settings?.inventory?.valuation || 'purchase';
+  const products = await Product.find({ businessId, archived: { $ne: true }, trackStock: true }).sort({ name: 1 });
+  const rows = products.map((product) => {
+    const qty = product.stockQuantity ?? 0;
+    const rate = method === 'retail' ? product.sellingPrice : product.purchasePrice;
+    return {
+      name: product.name,
+      sku: product.sku || '',
+      quantity: qty,
+      unit: product.unit,
+      rate,
+      value: rate == null ? null : roundMoney(rate * qty),
+      low: qty <= (product.lowStockThreshold ?? 5),
+    };
+  });
+  return { method, rows, total: roundMoney(rows.reduce((sum, row) => sum + (row.value || 0), 0)) };
+}
+
+export async function profitReport(businessId: string, from?: string, to?: string) {
+  const match = issuedMatch(businessId, from, to);
+  const invoices = await Invoice.find(match);
+  const products = await Product.find({ businessId });
+  const byId = new Map(products.map((product) => [String(product._id), product]));
+  let revenue = 0;
+  let cost = 0;
+  let unavailable = false;
+  for (const invoice of invoices) {
+    revenue += invoice.totals.taxableAmount || 0;
+    for (const item of invoice.items) {
+      const product = item.productId ? byId.get(String(item.productId)) : undefined;
+      const unit = item.unitCost != null ? item.unitCost : product?.purchasePrice;
+      if (unit == null) {
+        unavailable = true;
+        continue;
+      }
+      cost += unit * item.quantity;
+    }
+  }
+  const expenses = await Expense.find({
+    businessId,
+    archived: { $ne: true },
+    ...(from || to ? { dateKey: { ...(from ? { $gte: from } : {}), ...(to ? { $lte: to } : {}) } } : {}),
+  });
+  const expenseTotal = roundMoney(expenses.reduce((sum, row) => sum + row.amount, 0));
+  const gross = unavailable && cost === 0 ? null : roundMoney(revenue - cost);
+  return {
+    revenue: roundMoney(revenue),
+    cost: cost ? roundMoney(cost) : null,
+    grossProfit: gross,
+    expenses: expenseTotal,
+    netProfit: gross == null ? null : roundMoney(gross - expenseTotal),
+    costUnavailable: unavailable,
+  };
+}
+
+export async function expenseReport(businessId: string, from?: string, to?: string) {
+  const rows = await Expense.find({
+    businessId,
+    archived: { $ne: true },
+    ...(from || to ? { dateKey: { ...(from ? { $gte: from } : {}), ...(to ? { $lte: to } : {}) } } : {}),
+  }).sort({ dateKey: -1 });
+  return {
+    total: roundMoney(rows.reduce((sum, row) => sum + row.amount, 0)),
+    rows: rows.map((row) => ({ date: row.dateKey, name: row.name, category: row.category, vendor: row.vendor, method: row.method, amount: row.amount })),
+  };
 }
 
 export function toCsv(headers: string[], rows: (string | number)[][]): string {

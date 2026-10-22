@@ -6,11 +6,15 @@ import { htmlToPdf } from '../services/pdf.js';
 import {
   customerReport,
   dashboard,
+  expenseReport,
   gstReport,
+  inventoryReport,
   outstandingReport,
   paymentReport,
   presets,
   productReport,
+  profitReport,
+  purchaseReport,
   salesReport,
   toCsv,
 } from '../services/reports.js';
@@ -191,3 +195,58 @@ reportRouter.get(
     await sendReport(res, format, 'outstanding', report, csv, 'Outstanding');
   }),
 );
+
+reportRouter.get(
+  '/purchases',
+  asyncHandler(async (req, res) => {
+    const { from, to, format } = queryRange(req);
+    const report = await purchaseReport(req.auth!.businessId!, from, to);
+    const csv = toCsv(
+      ['Purchase', 'Date', 'Supplier', 'Supplier invoice', 'Total', 'Paid', 'Due'],
+      report.rows.map((row) => [row.number, row.date, row.supplier, row.invoice, row.total, row.paid, row.due]),
+    );
+    await sendReport(res, format, 'purchases', report, csv, 'Purchase report');
+  }),
+);
+
+reportRouter.get(
+  '/inventory',
+  asyncHandler(async (req, res) => {
+    const report = await inventoryReport(req.auth!.businessId!);
+    const csv = toCsv(
+      ['Product', 'SKU', 'Quantity', 'Unit', 'Rate', 'Value', 'Low'],
+      report.rows.map((row) => [row.name, row.sku, row.quantity, row.unit, row.rate ?? '', row.value ?? '', row.low ? 'yes' : '']),
+    );
+    await sendReport(res, formatFrom(req), 'inventory', report, csv, 'Inventory report');
+  }),
+);
+
+reportRouter.get(
+  '/profit',
+  asyncHandler(async (req, res) => {
+    const { from, to, format } = queryRange(req);
+    const report = await profitReport(req.auth!.businessId!, from, to);
+    const csv = toCsv(
+      ['Revenue', 'Cost', 'Gross profit', 'Expenses', 'Net profit'],
+      [[report.revenue, report.cost ?? '', report.grossProfit ?? '', report.expenses, report.netProfit ?? '']],
+    );
+    await sendReport(res, format, 'profit', report, csv, 'Profit report');
+  }),
+);
+
+reportRouter.get(
+  '/expenses',
+  asyncHandler(async (req, res) => {
+    const { from, to, format } = queryRange(req);
+    const report = await expenseReport(req.auth!.businessId!, from, to);
+    const csv = toCsv(
+      ['Date', 'Name', 'Category', 'Vendor', 'Method', 'Amount'],
+      report.rows.map((row) => [row.date, row.name, row.category, row.vendor, row.method, row.amount]),
+    );
+    await sendReport(res, format, 'expenses', report, csv, 'Expense report');
+  }),
+);
+
+function formatFrom(req: { query: Record<string, unknown> }) {
+  return String(req.query.export || '');
+}

@@ -6,7 +6,7 @@ import { inr, prettyDate } from '../lib/format';
 import { fail } from '../lib/toast';
 
 type PresetId = 'today' | 'week' | 'month' | 'quarter' | 'fy' | 'custom';
-type Tab = 'sales' | 'gst' | 'customers' | 'products' | 'payments' | 'outstanding';
+type Tab = 'sales' | 'products' | 'customers' | 'purchases' | 'inventory' | 'profit' | 'expenses' | 'gst' | 'payments' | 'outstanding';
 
 interface Presets {
   today: string;
@@ -61,16 +61,20 @@ export function Reports() {
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'sales', label: 'Sales' },
+    { id: 'products', label: 'Product sales' },
+    { id: 'customers', label: 'Customer sales' },
+    { id: 'purchases', label: 'Purchases' },
+    { id: 'inventory', label: 'Inventory' },
+    { id: 'profit', label: 'Profit' },
+    { id: 'expenses', label: 'Expenses' },
     { id: 'gst', label: 'GST' },
-    { id: 'customers', label: 'Customers' },
-    { id: 'products', label: 'Products' },
     { id: 'payments', label: 'Collections' },
     { id: 'outstanding', label: 'Outstanding' },
   ];
 
   return (
     <div>
-      <PageHeader title="Reports" lede="Issued invoices only. Drafts and cancelled bills are left out. Dates follow your shop timezone." />
+      <PageHeader title="Reports" lede="Sales are money in. Purchases are money out to suppliers. Expenses are operating costs. Inventory is what is on the shelf now." />
       <div className="mb-4 flex flex-wrap gap-2">
         {(presets ? (Object.keys(presets.ranges) as Exclude<PresetId, 'custom'>[]) : []).map((id) => (
           <Button key={id} variant={preset === id ? 'primary' : 'secondary'} onClick={() => choose(id)}>
@@ -106,6 +110,10 @@ export function Reports() {
       {data && tab === 'products' ? <ProductTable rows={(data.rows as ProductRow[]) || []} /> : null}
       {data && tab === 'payments' ? <PaymentTable data={data as unknown as PaymentData} /> : null}
       {data && tab === 'outstanding' ? <OutstandingTable data={data as unknown as OutstandingData} /> : null}
+      {data && tab === 'purchases' ? <PurchaseTable data={data as unknown as PurchaseData} /> : null}
+      {data && tab === 'inventory' ? <InventoryTable data={data as unknown as InventoryData} /> : null}
+      {data && tab === 'profit' ? <ProfitCard data={data as unknown as ProfitData} /> : null}
+      {data && tab === 'expenses' ? <ExpenseTable data={data as unknown as ExpenseData} /> : null}
     </div>
   );
 }
@@ -160,6 +168,51 @@ function PaymentTable({ data }: { data: PaymentData }) {
   return (
     <ReportShell summary={`Collected ${inr(data.total)}`}>
       <Table headers={['Date', 'Invoice', 'Customer', 'Method', 'Reference', 'Amount']} rows={data.rows.map((row) => [prettyDate(row.date), row.invoice, row.customer, row.method, row.reference || '—', inr(row.amount)])} />
+    </ReportShell>
+  );
+}
+
+interface PurchaseData { total: number; rows: { number: string; date: string; supplier: string; invoice: string; total: number; paid: number; due: number }[] }
+interface InventoryData { method: string; total: number; rows: { name: string; sku: string; quantity: number; unit: string; rate: number | null; value: number | null; low: boolean }[] }
+interface ProfitData { revenue: number; cost: number | null; grossProfit: number | null; expenses: number; netProfit: number | null; costUnavailable: boolean }
+interface ExpenseData { total: number; rows: { date: string; name: string; category: string; vendor: string; method: string; amount: number }[] }
+
+function moneyOrGap(value: number | null) {
+  return value == null ? 'Cost unavailable' : inr(value);
+}
+
+function PurchaseTable({ data }: { data: PurchaseData }) {
+  return (
+    <ReportShell summary={`Purchases ${inr(data.total)}`}>
+      <Table headers={['Purchase', 'Date', 'Supplier', 'Their invoice', 'Total', 'Paid', 'Due']} rows={data.rows.map((row) => [row.number, prettyDate(row.date), row.supplier, row.invoice || '—', inr(row.total), inr(row.paid), inr(row.due)])} />
+    </ReportShell>
+  );
+}
+
+function InventoryTable({ data }: { data: InventoryData }) {
+  return (
+    <ReportShell summary={`On-hand value ${inr(data.total)} · valued at ${data.method} price. Average uses the latest purchase price.`}>
+      <Table headers={['Product', 'SKU', 'Qty', 'Rate', 'Value', 'Low']} rows={data.rows.map((row) => [row.name, row.sku || '—', `${row.quantity} ${row.unit}`, row.rate == null ? 'Cost unavailable' : inr(row.rate), row.value == null ? 'Cost unavailable' : inr(row.value), row.low ? 'Yes' : ''])} />
+    </ReportShell>
+  );
+}
+
+function ProfitCard({ data }: { data: ProfitData }) {
+  return (
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <article className="rounded-3xl border border-line bg-card p-4"><p className="text-xs uppercase text-muted">Revenue</p><p className="mt-2 font-serif text-2xl">{inr(data.revenue)}</p></article>
+      <article className="rounded-3xl border border-line bg-card p-4"><p className="text-xs uppercase text-muted">Cost</p><p className="mt-2 font-serif text-2xl">{moneyOrGap(data.cost)}</p></article>
+      <article className="rounded-3xl border border-line bg-card p-4"><p className="text-xs uppercase text-muted">Gross profit</p><p className="mt-2 font-serif text-2xl">{moneyOrGap(data.grossProfit)}</p></article>
+      <article className="rounded-3xl border border-line bg-card p-4"><p className="text-xs uppercase text-muted">Expenses</p><p className="mt-2 font-serif text-2xl">{inr(data.expenses)}</p></article>
+      <article className="rounded-3xl border border-line bg-card p-4"><p className="text-xs uppercase text-muted">Estimated net profit</p><p className="mt-2 font-serif text-2xl">{moneyOrGap(data.netProfit)}</p>{data.costUnavailable ? <p className="mt-1 text-xs text-muted">Some lines have no purchase cost and were left out.</p> : null}</article>
+    </div>
+  );
+}
+
+function ExpenseTable({ data }: { data: ExpenseData }) {
+  return (
+    <ReportShell summary={`Operating expenses ${inr(data.total)}`}>
+      <Table headers={['Date', 'Name', 'Category', 'Vendor', 'Method', 'Amount']} rows={data.rows.map((row) => [prettyDate(row.date), row.name, row.category, row.vendor || '—', row.method, inr(row.amount)])} />
     </ReportShell>
   );
 }

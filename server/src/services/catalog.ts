@@ -120,30 +120,61 @@ export async function saveCustomer(businessId: string, input: CustomerInput, cus
 
 export async function saveProduct(businessId: string, input: ProductInput, productId?: string) {
   const gstRate = await assertGstRate(businessId, input.gstRate);
+  const specs = (input.specifications || [])
+    .map((row) => ({ label: row.label.trim(), value: row.value.trim() }))
+    .filter((row) => row.label && row.value);
   const payload = {
     name: input.name.trim(),
     sku: input.sku?.trim() || '',
     hsnSac: input.hsnSac?.trim() || '',
     category: input.category?.trim() || '',
+    subCategory: input.subCategory?.trim() || '',
+    brand: input.brand?.trim() || '',
     unit: input.unit?.trim() || 'pcs',
     sellingPrice: roundRate(input.sellingPrice),
+    purchasePrice: input.purchasePrice == null ? null : roundRate(input.purchasePrice),
+    wholesalePrice: input.wholesalePrice == null ? null : roundRate(input.wholesalePrice),
     gstRate,
     trackStock: Boolean(input.trackStock),
-    stockQuantity: input.trackStock ? input.stockQuantity ?? 0 : null,
     lowStockThreshold: input.lowStockThreshold ?? 5,
     description: input.description?.trim() || '',
+    specifications: specs,
+    status: input.status || 'active',
   };
   try {
     if (productId) {
-      const product = await Product.findOneAndUpdate(
-        { _id: productId, businessId, archived: { $ne: true } },
-        payload,
-        { new: true },
-      );
-      if (!product) throw new HttpError(404, 'Product not found.');
-      return product;
+      const existing = await Product.findOne({ _id: productId, businessId, archived: { $ne: true } });
+      if (!existing) throw new HttpError(404, 'Product not found.');
+      const previous = existing.stockQuantity ?? 0;
+      Object.assign(existing, payload);
+      if (!payload.trackStock) existing.stockQuantity = null;
+      await existing.save();
+      if (payload.trackStock && input.stockQuantity != null) {
+        const delta = Math.round((input.stockQuantity - previous) * 1000) / 1000;
+        if (delta !== 0) {
+          const { commitStock } = await import('./stock.js');
+          const { todayKey } = await import('../domain/dates.js');
+          await commitStock(businessId, [
+            {
+              productId,
+              quantity: Math.abs(delta),
+              direction: delta > 0 ? 'in' : 'out',
+              type: 'adjustment',
+              reference: 'Stock edit',
+              dateKey: todayKey('Asia/Kolkata'),
+            },
+          ]);
+        }
+      }
+      return Product.findById(existing._id);
     }
-    return await Product.create({ businessId, ...payload });
+    const opening = payload.trackStock ? input.stockQuantity ?? 0 : null;
+    const created = await Product.create({ businessId, ...payload, stockQuantity: opening });
+    if (payload.trackStock && (opening || 0) > 0) {
+      const { noteOpening } = await import('./stock.js');
+      await noteOpening(businessId, String(created._id), opening || 0);
+    }
+    return created;
   } catch (error) {
     if (isDuplicate(error)) throw new HttpError(409, 'That SKU is already used.');
     throw error;
@@ -296,6 +327,9 @@ export async function saveSettings(businessId: string, input: SettingsInput) {
     }
     settings.defaults = { ...settings.defaults, ...input.defaults };
   }
+  if (input.inventory) settings.set('inventory', { allowNegativeStock: false, lowStockThreshold: 5, valuation: 'purchase', ...(settings.inventory || {}), ...input.inventory });
+  if (input.catalog) settings.set('catalog', { showRetail: true, showWholesale: true, showGst: false, layout: 'grid', perPage: 6, ...(settings.catalog || {}), ...input.catalog });
+  if (input.documents) settings.set('documents', { maxUploadMb: 8, allowedTypes: ['pdf', 'jpg', 'jpeg', 'png'], ...(settings.documents || {}), ...input.documents });
   await settings.save();
   return settings;
 }

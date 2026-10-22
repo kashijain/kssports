@@ -9,7 +9,14 @@ import { InvoiceForm } from './pages/InvoiceForm';
 import { InvoiceView } from './pages/InvoiceView';
 import { Invoices } from './pages/Invoices';
 import { Payments } from './pages/Payments';
+import { Catalog } from './pages/Catalog';
+import { DocumentsPage } from './pages/Documents';
+import { Expenses } from './pages/Expenses';
+import { Machines } from './pages/Machines';
+import { ProductDetail } from './pages/ProductDetail';
 import { Products } from './pages/Products';
+import { Purchases } from './pages/Purchases';
+import { Sales } from './pages/Sales';
 import { Reports } from './pages/Reports';
 import { SettingsPage } from './pages/Settings';
 import { Setup } from './pages/Setup';
@@ -35,6 +42,14 @@ export function App() {
             <Route path="/customers" element={<Customers />} />
             <Route path="/customers/:id" element={<CustomerDetail />} />
             <Route path="/products" element={<Products />} />
+            <Route path="/products/:id" element={<ProductDetail />} />
+            <Route path="/catalog" element={<Catalog />} />
+            <Route path="/purchases" element={<Purchases />} />
+            <Route path="/sales" element={<Sales />} />
+            <Route path="/machines" element={<Machines />} />
+            <Route path="/machines/:id" element={<Machines />} />
+            <Route path="/expenses" element={<Expenses />} />
+            <Route path="/documents" element={<DocumentsPage />} />
             <Route path="/payments" element={<Payments />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/settings" element={<SettingsPage />} />

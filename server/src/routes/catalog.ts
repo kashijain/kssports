@@ -5,6 +5,10 @@ import { Customer, Invoice, Product } from '../models.js';
 import { presentCustomer, presentInvoiceListItem, presentProduct } from '../present.js';
 import { customerSchema, productSchema } from '../schemas.js';
 import { saveCustomer, saveProduct } from '../services/catalog.js';
+import { productActivity } from '../services/operations.js';
+import { commitStock } from '../services/stock.js';
+import { upload, removeUpload } from '../services/files.js';
+import { todayKey } from '../domain/dates.js';
 import { escapeRegex, pageQuery } from '../util.js';
 import { parseBody } from '../validate.js';
 
@@ -103,6 +107,69 @@ productRouter.post(
   asyncHandler(async (req, res) => {
     const product = await saveProduct(req.auth!.businessId!, parseBody(productSchema, req.body));
     res.status(201).json({ product: presentProduct(product) });
+  }),
+);
+
+productRouter.get(
+  '/:id/activity',
+  asyncHandler(async (req, res) => {
+    res.json(await productActivity(req.auth!.businessId!, req.params.id));
+  }),
+);
+
+productRouter.post(
+  '/:id/stock',
+  asyncHandler(async (req, res) => {
+    const quantity = Number(req.body?.quantity);
+    if (!quantity || quantity <= 0) throw new HttpError(400, 'Enter a quantity to add.');
+    const product = await Product.findOne({ _id: req.params.id, businessId: req.auth!.businessId });
+    if (!product) throw new HttpError(404, 'Product not found.');
+    if (!product.trackStock) {
+      product.trackStock = true;
+      product.stockQuantity = product.stockQuantity ?? 0;
+      await product.save();
+    }
+    await commitStock(req.auth!.businessId!, [
+      {
+        productId: String(product._id),
+        quantity,
+        direction: 'in',
+        type: 'adjustment',
+        reference: 'Stock added',
+        dateKey: String(req.body?.date || todayKey('Asia/Kolkata')),
+        note: String(req.body?.note || ''),
+      },
+    ]);
+    const fresh = await Product.findById(product._id);
+    res.json({ product: presentProduct(fresh) });
+  }),
+);
+
+productRouter.post(
+  '/:id/images',
+  upload.single('file'),
+  asyncHandler(async (req, res) => {
+    const product = await Product.findOne({ _id: req.params.id, businessId: req.auth!.businessId });
+    if (!product) throw new HttpError(404, 'Product not found.');
+    if (!req.file) throw new HttpError(400, 'Choose an image.');
+    const relative = `${req.auth!.businessId}/${req.file.filename}`;
+    product.images.push({ path: relative, alt: product.name });
+    await product.save();
+    res.status(201).json({ product: presentProduct(product) });
+  }),
+);
+
+productRouter.delete(
+  '/:id/images/:imageId',
+  asyncHandler(async (req, res) => {
+    const product = await Product.findOne({ _id: req.params.id, businessId: req.auth!.businessId });
+    if (!product) throw new HttpError(404, 'Product not found.');
+    const image = product.images.id(req.params.imageId);
+    if (!image) throw new HttpError(404, 'Image not found.');
+    await removeUpload(image.path || '');
+    image.deleteOne();
+    await product.save();
+    res.json({ product: presentProduct(product) });
   }),
 );
 

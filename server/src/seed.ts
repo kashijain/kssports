@@ -5,27 +5,97 @@ import { Business, Customer, Product, User } from './models.js';
 import { saveBusiness, saveProduct } from './services/catalog.js';
 import { createInvoice, recordPayment } from './services/invoices.js';
 
-const DEMO_EMAIL = 'demo@lekha.test';
+const DEMO_EMAIL = 'demo@kssports.test';
 
 function gstin(stateCode: string, pan: string, entity = '1'): string {
   const body = `${stateCode}${pan}${entity}Z`;
   return body + gstinCheckCharacter(body);
 }
 
+async function ensureSports(businessId: string) {
+  if (await Product.exists({ businessId, sku: 'KS-BAT-001' })) return;
+  const shared = { brand: 'KS Sports', unit: 'pcs', trackStock: true, status: 'active' as const };
+  await saveProduct(businessId, {
+    ...shared,
+    name: 'KS English Willow Cricket Bat',
+    sku: 'KS-BAT-001',
+    category: 'Cricket',
+    subCategory: 'Bats',
+    hsnSac: '9506',
+    sellingPrice: 18500,
+    purchasePrice: 12000,
+    wholesalePrice: 15000,
+    gstRate: 12,
+    stockQuantity: 8,
+    lowStockThreshold: 2,
+    description: 'Grade A English willow bat pressed in the KS Sports workshop.',
+    specifications: [
+      { label: 'Grade', value: 'A' },
+      { label: 'Weight', value: '1160g' },
+      { label: 'Handle', value: 'Short handle' },
+    ],
+  });
+  await saveProduct(businessId, {
+    ...shared,
+    name: 'Leather Cricket Ball',
+    sku: 'KS-BAL-001',
+    category: 'Cricket',
+    subCategory: 'Balls',
+    hsnSac: '9506',
+    sellingPrice: 850,
+    purchasePrice: 420,
+    wholesalePrice: 640,
+    gstRate: 12,
+    stockQuantity: 40,
+    description: 'Four-piece leather match ball.',
+    specifications: [{ label: 'Weight', value: '156g' }],
+  });
+  await saveProduct(businessId, {
+    ...shared,
+    name: 'Batting Gloves',
+    sku: 'KS-GLV-001',
+    category: 'Cricket',
+    subCategory: 'Protection',
+    unit: 'pair',
+    hsnSac: '9506',
+    sellingPrice: 2400,
+    purchasePrice: 1100,
+    wholesalePrice: 1800,
+    gstRate: 18,
+    stockQuantity: 15,
+    description: 'Padded club gloves.',
+  });
+}
+
 export async function seedDemo(): Promise<void> {
-  if (await User.exists({ email: DEMO_EMAIL })) return;
+  const legacy = await User.findOne({ email: 'demo@lekha.test' });
+  if (legacy && !(await User.exists({ email: DEMO_EMAIL }))) {
+    legacy.email = DEMO_EMAIL;
+    legacy.name = 'KS Sports';
+    await legacy.save();
+  }
+  const existing = await User.findOne({ email: DEMO_EMAIL });
+  if (existing?.businessId) {
+    await Business.updateOne(
+      { _id: existing.businessId, name: 'Meera Textiles' },
+      { $set: { name: 'KS Sports', email: 'hello@kssports.test' } },
+    );
+    await ensureSports(String(existing.businessId));
+    return;
+  }
+  if (existing) return;
   const user = await User.create({
-    name: 'Meera Sharma',
+    name: 'KS Sports',
     email: DEMO_EMAIL,
     passwordHash: await bcrypt.hash('Demo@12345', 10),
     role: 'owner',
   });
   const pan = 'AAPFM8421Q';
   const { business } = await saveBusiness(String(user._id), {
-    name: 'Meera Textiles',
-    ownerName: 'Meera Sharma',
+    name: 'KS Sports',
+    ownerName: 'KS Sports',
     mobile: '9829012345',
-    email: 'hello@meeratextiles.test',
+    email: 'hello@kssports.test',
     addressLine1: '14, Johari Bazaar',
     addressLine2: 'Near Hawa Mahal',
     city: 'Jaipur',
@@ -36,7 +106,7 @@ export async function seedDemo(): Promise<void> {
     upiId: 'meera@okaxis',
     bank: {
       bankName: 'State Bank of India',
-      accountName: 'Meera Textiles',
+      accountName: 'KS Sports',
       accountNumber: '39281055421',
       ifsc: 'SBIN0001234',
     },
@@ -210,7 +280,7 @@ export async function seedDemo(): Promise<void> {
     placeOfSupplyStateCode: '08',
     items: [line(cloth, 4)],
   });
-
+  await ensureSports(businessId);
   }
 
 export const demoLogin = { email: DEMO_EMAIL, password: 'Demo@12345' };

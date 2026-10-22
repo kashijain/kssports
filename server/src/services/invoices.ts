@@ -205,15 +205,37 @@ async function claimNumber(businessId: string, invoiceDate: string, requested: s
   throw new HttpError(409, 'Could not allocate a unique invoice number. Check numbering in Settings.');
 }
 
-async function adjustStock(businessId: string, items: { productId?: unknown; quantity: number }[], sign: 1 | -1) {
+async function attachUnitCost(businessId: string, items: { productId?: unknown; unitCost?: number | null }[]) {
   for (const item of items) {
-    if (!item.productId) continue;
+    if (!item.productId) {
+      item.unitCost = null;
+      continue;
+    }
     const product = await Product.findOne({ _id: item.productId, businessId });
-    if (!product?.trackStock) continue;
-    const next = Math.round(((product.stockQuantity ?? 0) + sign * item.quantity) * 1000) / 1000;
-    product.stockQuantity = next;
-    await product.save();
+    item.unitCost = product?.purchasePrice ?? null;
   }
+}
+
+async function adjustStock(
+  businessId: string,
+  items: { productId?: unknown; quantity: number }[],
+  sign: 1 | -1,
+  meta: { reference: string; dateKey: string; type: 'sale' | 'sale_reversal' },
+) {
+  const { commitStock } = await import('./stock.js');
+  await commitStock(
+    businessId,
+    items
+      .filter((item) => item.productId)
+      .map((item) => ({
+        productId: String(item.productId),
+        quantity: item.quantity,
+        direction: sign < 0 ? 'out' : 'in',
+        type: meta.type,
+        reference: meta.reference,
+        dateKey: meta.dateKey,
+      })),
+  );
 }
 
 async function stockWarnings(businessId: string, items: { productId?: unknown }[]) {
@@ -328,6 +350,7 @@ export async function createInvoice(businessId: string, input: InvoiceInput) {
     (input.status === 'draft' ? '' : addDays(input.invoiceDate, Math.min(365, Math.max(0, settings.defaults.paymentTermsDays || 0))));
   const numbered = await claimNumber(businessId, input.invoiceDate, input.number || '');
   const items = itemsFrom(prepared.lines, prepared.totals);
+  await attachUnitCost(businessId, items);
   const grand = prepared.totals.grandTotal;
   let status: InvoiceStatus = input.status;
   if (status !== 'draft' && toPaise(grand) === 0) status = 'paid';
@@ -377,7 +400,14 @@ export async function createInvoice(businessId: string, input: InvoiceInput) {
     if (isDuplicate(error)) throw new HttpError(409, 'That invoice number is already used.');
     throw error;
   });
-  if (isIssued(invoice.status)) await adjustStock(businessId, items, -1);
+  if (isIssued(invoice.status)) {
+    try {
+      await adjustStock(businessId, items, -1, { reference: invoice.number, dateKey: invoice.invoiceDateKey, type: 'sale' });
+    } catch (error) {
+      await Invoice.deleteOne({ _id: invoice._id });
+      throw error;
+    }
+  }
   if (payment && isIssued(invoice.status)) {
     await recordPayment(businessId, {
       invoiceId: String(invoice._id),
@@ -423,6 +453,7 @@ export async function updateInvoice(businessId: string, invoiceId: string, input
     invoice.number = input.number;
   }
   const items = itemsFrom(prepared.lines, prepared.totals);
+  await attachUnitCost(businessId, items);
   const grand = prepared.totals.grandTotal;
   if (isIssued(invoice.status) && toPaise(grand) < toPaise(invoice.amountPaid)) {
     throw new HttpError(400, `The new total is less than ${formatInr(invoice.amountPaid)} already received.`);
@@ -469,8 +500,16 @@ export async function updateInvoice(businessId: string, invoiceId: string, input
     throw error;
   }
   if (invoice.status !== 'draft') await refreshPayments(invoice);
-  if (wasIssued) await adjustStock(businessId, previousItems, +1);
-  if (isIssued(invoice.status)) await adjustStock(businessId, items, -1);
+  if (wasIssued) {
+    await adjustStock(businessId, previousItems, +1, {
+      reference: invoice.number,
+      dateKey: invoice.invoiceDateKey,
+      type: 'sale_reversal',
+    });
+  }
+  if (isIssued(invoice.status)) {
+    await adjustStock(businessId, items, -1, { reference: invoice.number, dateKey: invoice.invoiceDateKey, type: 'sale' });
+  }
   const warnings = isIssued(invoice.status) ? await stockWarnings(businessId, items) : [];
   return { invoice: await detail(businessId, String(invoice._id)), warnings };
 }
@@ -490,7 +529,7 @@ export async function cancelInvoice(businessId: string, invoiceId: string, reaso
   invoice.cancelReason = reason || '';
   invoice.amountDue = 0;
   await invoice.save();
-  await adjustStock(businessId, items, +1);
+  await adjustStock(businessId, items, +1, { reference: invoice.number, dateKey: invoice.invoiceDateKey, type: 'sale_reversal' });
   const warnings = payments
     ? ['Payments already recorded on this invoice stay in the payment list. It is no longer included in sales.']
     : [];

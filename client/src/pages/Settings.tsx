@@ -7,7 +7,7 @@ import { api } from '../lib/api';
 import { fail } from '../lib/toast';
 import type { Business, Settings, TaxRate } from '../types';
 
-type Tab = 'profile' | 'invoice' | 'tax' | 'bank' | 'look' | 'account';
+type Tab = 'profile' | 'invoice' | 'tax' | 'bank' | 'look' | 'inventory' | 'catalog' | 'documents' | 'account';
 
 export function SettingsPage() {
   const { user, business, settings, setSession, refresh } = useAuth();
@@ -43,6 +43,13 @@ export function SettingsPage() {
   const [rateName, setRateName] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [inventory, setInventory] = useState(
+    settings?.inventory ?? { allowNegativeStock: false, lowStockThreshold: settings?.defaults.lowStockThreshold ?? 5, valuation: 'purchase' as const },
+  );
+  const [catalog, setCatalog] = useState(
+    settings?.catalog ?? { showRetail: true, showWholesale: true, showGst: false, layout: 'grid' as const, perPage: 6 },
+  );
+  const [documents, setDocuments] = useState(settings?.documents ?? { maxUploadMb: 8, allowedTypes: ['pdf', 'jpg', 'jpeg', 'png'] });
 
   useEffect(() => {
     api<{ nextNumber: string; taxRates?: TaxRate[] }>('/api/settings')
@@ -192,6 +199,30 @@ export function SettingsPage() {
     }
   }
 
+  async function saveSlice(body: object, message: string) {
+    setBusy(true);
+    try {
+      const data = await api<{ settings: Settings }>('/api/settings', { method: 'PUT', body: JSON.stringify(body) });
+      setInventory(data.settings.inventory);
+      setCatalog(data.settings.catalog);
+      setDocuments(data.settings.documents);
+      await refresh();
+      toast.success(message);
+    } catch (error) {
+      fail(error);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function toggleFileType(type: string) {
+    setDocuments((current) => {
+      const has = current.allowedTypes.includes(type);
+      const next = has ? current.allowedTypes.filter((item) => item !== type) : [...current.allowedTypes, type];
+      return { ...current, allowedTypes: next.length ? next : current.allowedTypes };
+    });
+  }
+
   async function changePassword(event: React.FormEvent) {
     event.preventDefault();
     setBusy(true);
@@ -213,12 +244,15 @@ export function SettingsPage() {
     { id: 'tax', label: 'Tax settings' },
     { id: 'bank', label: 'Bank / UPI' },
     { id: 'look', label: 'Invoice look' },
+    { id: 'inventory', label: 'Inventory' },
+    { id: 'catalog', label: 'Catalog' },
+    { id: 'documents', label: 'Documents' },
     { id: 'account', label: 'Account' },
   ];
 
   return (
     <div>
-      <PageHeader title="Settings" lede="Changes apply to the next invoice. Issued bills keep the shop, customer, prices, and tax from the day they were made." />
+      <PageHeader title="Settings" lede="KS Sports profile, invoice numbering, stock rules, and the catalog PDF. Issued bills keep the shop, customer, prices, and tax from the day they were made." />
       {!owner ? <p className="mb-4 rounded-2xl bg-amber px-3 py-2 text-sm">Only the owner can change shop, tax, and invoice settings.</p> : null}
       <div className="mb-4 flex gap-2 overflow-auto">
         {tabs.map((item) => (
@@ -282,7 +316,7 @@ export function SettingsPage() {
 
       {tab === 'tax' ? (
         <div className="max-w-3xl rounded-3xl border border-line bg-card p-4">
-          <p className="text-sm text-muted">These are the rates your shop can put on a bill. Lekha does not decide which rate a product should use, and it does not treat this list as a legal schedule.</p>
+          <p className="text-sm text-muted">These are the rates KS Sports can put on a bill. The list is yours to edit. It is not treated as a legal schedule.</p>
           <ul className="mt-4 grid gap-2">
             {rates.map((rate) => (
               <li key={rate.id} className="flex items-center justify-between gap-3 rounded-2xl border border-line px-3 py-2">
@@ -356,6 +390,83 @@ export function SettingsPage() {
           <Field label="Terms & conditions"><TextArea value={defaults.terms} onChange={(event) => setDefaults({ ...defaults, terms: event.target.value })} disabled={!owner} /></Field>
           <Field label="Footer"><TextInput value={defaults.footer} onChange={(event) => setDefaults({ ...defaults, footer: event.target.value })} disabled={!owner} /></Field>
           {owner ? <Button type="submit" disabled={busy}>Save invoice look</Button> : null}
+        </form>
+      ) : null}
+
+      {tab === 'inventory' ? (
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            void saveSlice({ inventory }, 'Inventory settings saved.');
+          }}
+          className="grid max-w-3xl gap-3 rounded-3xl border border-line bg-card p-4"
+        >
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={inventory.allowNegativeStock} disabled={!owner} onChange={(event) => setInventory({ ...inventory, allowNegativeStock: event.target.checked })} />
+            Allow negative stock
+          </label>
+          <p className="text-xs text-muted">Off by default. A sale or purchase that would take stock below zero is refused until this is turned on.</p>
+          <Field label="Low stock threshold">
+            <TextInput type="number" min={0} value={inventory.lowStockThreshold} disabled={!owner} onChange={(event) => setInventory({ ...inventory, lowStockThreshold: Number(event.target.value) })} />
+          </Field>
+          <Field label="Stock valuation">
+            <SelectInput value={inventory.valuation} disabled={!owner} onChange={(event) => setInventory({ ...inventory, valuation: event.target.value as Settings['inventory']['valuation'] })}>
+              <option value="purchase">Purchase price</option>
+              <option value="average">Latest purchase price</option>
+              <option value="retail">Retail price</option>
+            </SelectInput>
+          </Field>
+          <p className="text-xs text-muted">Average currently uses the latest purchase price. A product with no purchase cost is shown as cost unavailable.</p>
+          {owner ? <Button type="submit" disabled={busy}>Save inventory</Button> : null}
+        </form>
+      ) : null}
+
+      {tab === 'catalog' ? (
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            void saveSlice({ catalog }, 'Catalog settings saved.');
+          }}
+          className="grid max-w-3xl gap-3 rounded-3xl border border-line bg-card p-4"
+        >
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={catalog.showRetail} disabled={!owner} onChange={(event) => setCatalog({ ...catalog, showRetail: event.target.checked })} /> Show retail price</label>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={catalog.showWholesale} disabled={!owner} onChange={(event) => setCatalog({ ...catalog, showWholesale: event.target.checked })} /> Show wholesale price</label>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={catalog.showGst} disabled={!owner} onChange={(event) => setCatalog({ ...catalog, showGst: event.target.checked })} /> Show GST</label>
+          <Field label="Layout">
+            <SelectInput value={catalog.layout} disabled={!owner} onChange={(event) => setCatalog({ ...catalog, layout: event.target.value as Settings['catalog']['layout'] })}>
+              <option value="grid">Grid</option>
+              <option value="list">List</option>
+            </SelectInput>
+          </Field>
+          <Field label="Products per page">
+            <TextInput type="number" min={1} max={12} value={catalog.perPage} disabled={!owner} onChange={(event) => setCatalog({ ...catalog, perPage: Number(event.target.value) })} />
+          </Field>
+          {owner ? <Button type="submit" disabled={busy}>Save catalog</Button> : null}
+        </form>
+      ) : null}
+
+      {tab === 'documents' ? (
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            void saveSlice({ documents }, 'Document settings saved.');
+          }}
+          className="grid max-w-3xl gap-3 rounded-3xl border border-line bg-card p-4"
+        >
+          <Field label="Maximum upload size (MB)">
+            <TextInput type="number" min={1} max={20} value={documents.maxUploadMb} disabled={!owner} onChange={(event) => setDocuments({ ...documents, maxUploadMb: Number(event.target.value) })} />
+          </Field>
+          <fieldset className="grid gap-2 text-sm">
+            <legend className="mb-1 font-medium">Allowed file types</legend>
+            {['pdf', 'jpg', 'jpeg', 'png'].map((type) => (
+              <label key={type} className="flex items-center gap-2 uppercase">
+                <input type="checkbox" checked={documents.allowedTypes.includes(type)} disabled={!owner} onChange={() => toggleFileType(type)} />
+                {type}
+              </label>
+            ))}
+          </fieldset>
+          <p className="text-xs text-muted">Supplier bills, machine papers, and expense receipts stay private and are served only to a signed-in user.</p>
+          {owner ? <Button type="submit" disabled={busy}>Save documents</Button> : null}
         </form>
       ) : null}
 

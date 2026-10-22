@@ -1,6 +1,6 @@
 import { Plus, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuth, useMeta } from '../auth';
 import { CustomerFields } from '../components/CustomerFields';
@@ -46,6 +46,8 @@ function blankLine(gstRate = '0'): Line {
 
 export function InvoiceForm() {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
+  const presetProduct = searchParams.get('product') || '';
   const editing = Boolean(id);
   const navigate = useNavigate();
   const { business, settings } = useAuth();
@@ -97,6 +99,31 @@ export function InvoiceForm() {
       })
       .catch(fail);
   }, []);
+
+  useEffect(() => {
+    if (editing || !presetProduct || products.length === 0) return;
+    const product = products.find((item) => item.id === presetProduct);
+    if (!product) return;
+    setLines((current) => {
+      if (current.some((line) => line.productId === product.id || line.name.trim())) return current;
+      return [
+        {
+          key: crypto.randomUUID(),
+          productId: product.id,
+          name: product.name,
+          sku: product.sku,
+          hsnSac: product.hsnSac,
+          description: product.description,
+          unit: product.unit,
+          quantity: '1',
+          rate: String(product.sellingPrice),
+          discountMode: 'amount',
+          discountValue: '0',
+          gstRate: String(product.gstRate),
+        },
+      ];
+    });
+  }, [editing, presetProduct, products]);
 
   useEffect(() => {
     if (!id) return;
@@ -529,7 +556,7 @@ export function InvoiceForm() {
                 );
               })}
             </div>
-            <p className="mt-3 text-xs text-muted">You choose the GST rate and HSN/SAC. Lekha only calculates the split you selected.</p>
+            <p className="mt-3 text-xs text-muted">You choose the GST rate and HSN/SAC. KS Sports only calculates the split you selected.</p>
           </section>
 
           <section className="rounded-3xl border border-line bg-card p-4">
