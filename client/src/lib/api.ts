@@ -17,6 +17,9 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (response.status === 204) return undefined as T;
   const text = await response.text();
   const data = text ? JSON.parse(text) : {};
+  if (response.status === 401 && !path.startsWith('/api/auth/') && !window.location.pathname.startsWith('/login') && !window.location.pathname.startsWith('/share')) {
+    window.location.assign('/login');
+  }
   if (!response.ok) {
     throw new ApiError(data?.error?.message || 'Something went wrong.', response.status, data?.error?.fields);
   }

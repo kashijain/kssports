@@ -24,18 +24,32 @@ export function signToken(user: { id: string; tokenVersion: number; role: string
   return jwt.sign({ sub: user.id, tv: user.tokenVersion, role: user.role }, config.jwtSecret, { expiresIn: '7d' });
 }
 
-export function setAuthCookie(res: Response, token: string): void {
-  res.cookie('lekha_session', token, {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: config.cookieSecure,
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-    path: '/',
-  });
+function secureCookie(req: Request): boolean {
+  const origin = req.get('origin') || req.get('referer') || '';
+  return config.cookieSecure || req.secure || origin.startsWith('https://');
 }
 
-export function clearAuthCookie(res: Response): void {
-  res.clearCookie('lekha_session', { path: '/' });
+function cookieOptions(req: Request) {
+  const secure = secureCookie(req);
+  return {
+    httpOnly: true,
+    secure,
+    sameSite: (secure ? 'none' : 'lax') as 'none' | 'lax',
+    path: '/',
+  };
+}
+
+export function setAuthCookie(req: Request, res: Response, token: string): void {
+  const options = cookieOptions(req);
+  res.clearCookie('lekha_session', { path: '/', httpOnly: true, sameSite: 'lax', secure: false });
+  res.clearCookie('lekha_session', { path: '/', httpOnly: true, sameSite: 'none', secure: true });
+  res.cookie('lekha_session', token, { ...options, maxAge: 7 * 24 * 60 * 60 * 1000 });
+}
+
+export function clearAuthCookie(req: Request, res: Response): void {
+  const options = cookieOptions(req);
+  res.clearCookie('lekha_session', options);
+  res.clearCookie('lekha_session', { path: '/', httpOnly: true, sameSite: 'lax', secure: false });
 }
 
 function readToken(req: Request): string | null {

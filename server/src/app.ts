@@ -18,9 +18,21 @@ import { reportRouter } from './routes/reports.js';
 
 export function createApp() {
   const app = express();
+  app.set('trust proxy', 1);
   app.disable('x-powered-by');
   app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
-  app.use(cors({ origin: config.clientOrigin, credentials: true }));
+  app.use(cors({
+    origin(origin, callback) {
+      if (!origin || origin === config.clientOrigin) {
+        callback(null, true);
+        return;
+      }
+      const local = /^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/.test(origin);
+      const preview = origin.endsWith('.cvm.dev') || origin.endsWith('.cursor.com');
+      callback(null, local || preview);
+    },
+    credentials: true,
+  }));
   app.use(express.json({ limit: '1mb' }));
   app.use(cookieParser());
 

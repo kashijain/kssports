@@ -33,7 +33,7 @@ authRouter.post(
       passwordHash: await bcrypt.hash(body.password, 10),
       role: 'owner',
     });
-    setAuthCookie(res, signToken({ id: String(user._id), tokenVersion: user.tokenVersion, role: user.role }));
+    setAuthCookie(req, res, signToken({ id: String(user._id), tokenVersion: user.tokenVersion, role: user.role }));
     res.status(201).json(await session(user));
   }),
 );
@@ -45,15 +45,15 @@ authRouter.post(
     const user = await User.findOne({ email: body.email.toLowerCase() });
     const match = user ? await bcrypt.compare(body.password, user.passwordHash) : false;
     if (!user || !match) throw new HttpError(401, 'Email or password is incorrect.');
-    setAuthCookie(res, signToken({ id: String(user._id), tokenVersion: user.tokenVersion, role: user.role }));
+    setAuthCookie(req, res, signToken({ id: String(user._id), tokenVersion: user.tokenVersion, role: user.role }));
     res.json(await session(user));
   }),
 );
 
 authRouter.post(
   '/logout',
-  asyncHandler(async (_req, res) => {
-    clearAuthCookie(res);
+  asyncHandler(async (req, res) => {
+    clearAuthCookie(req, res);
     res.json({ ok: true });
   }),
 );
@@ -104,7 +104,7 @@ authRouter.post(
     user.resetTokenHash = '';
     user.resetTokenExpires = null;
     await user.save();
-    clearAuthCookie(res);
+    clearAuthCookie(req, res);
     res.json({ ok: true });
   }),
 );
@@ -121,7 +121,7 @@ authRouter.post(
     user.passwordHash = await bcrypt.hash(body.newPassword, 10);
     user.tokenVersion += 1;
     await user.save();
-    setAuthCookie(res, signToken({ id: String(user._id), tokenVersion: user.tokenVersion, role: user.role }));
+    setAuthCookie(req, res, signToken({ id: String(user._id), tokenVersion: user.tokenVersion, role: user.role }));
     res.json({ ok: true });
   }),
 );
