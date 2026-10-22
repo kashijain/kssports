@@ -1,0 +1,24 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Outfit", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Fraunces", "Liberation Serif", Georgia, serif;
+  --color-ink: #1c1915;
+  --color-paper: #f3efe6;
+  --color-card: #fffcf8;
+  --color-clay: #c24d24;
+  --color-clay-dark: #9a3b1a;
+  --color-teal: #1d6b58;
+  --color-line: #e4dccf;
+  --color-muted: #6f675e;
+  --color-sidebar: #171512;
+  --color-amber: #f4e6cf;
+}
+
+html, body, #root { min-height: 100%; }
+body { margin: 0; background: var(--color-paper); color: var(--color-ink); font-family: var(--font-sans); }
+button, input, select, textarea { font: inherit; }
+dialog { border: 0; padding: 0; color: inherit; background: var(--color-card); }
+dialog::backdrop { background: rgba(23, 21, 18, 0.46); }
+:focus-visible { outline: 2px solid var(--color-clay); outline-offset: 2px; }
+.tabular { font-variant-numeric: tabular-nums; }

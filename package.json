@@ -1,0 +1,20 @@
+{
+  "name": "lekha",
+  "private": true,
+  "workspaces": [
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "build": "npm run build -w client && npm run build -w server",
+    "start": "npm run start -w server",
+    "dev": "npm run dev -w server",
+    "test": "npm run test -w server",
+    "typecheck": "npm run typecheck -w server && npm run typecheck -w client",
+    "seed": "npm run seed -w server",
+    "mongo": "bash scripts/mongo.sh"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

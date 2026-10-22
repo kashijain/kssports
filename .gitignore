@@ -1,0 +1,12 @@
+node_modules
+dist
+.env
+uploads
+.data
+.tools
+*.log
+client/dist
+server/dist
+.DS_Store
+coverage
+agent-tools
