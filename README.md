@@ -27,7 +27,7 @@ The sample shop signs in as `demo@kssports.test` / `Demo@12345` when `SEED_DEMO=
 For UI work while the API is already running:
 
 ```bash
-npm run dev -w client
+npm --prefix client run dev
 ```
 
 That Vite server proxies `/api` to port 47291.
