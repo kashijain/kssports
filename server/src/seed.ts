@@ -5,7 +5,7 @@ import bcrypt from 'bcryptjs';
 import { uploadsDir } from './config.js';
 import { addDays, todayKey } from './domain/dates.js';
 import { gstinCheckCharacter } from './domain/gstin.js';
-import { Business, Customer, Product, User } from './models.js';
+import { Business, BusinessSettings, Customer, Invoice, Product, User } from './models.js';
 import { saveBusiness, saveProduct } from './services/catalog.js';
 import { createInvoice, recordPayment } from './services/invoices.js';
 
@@ -16,6 +16,40 @@ const DEMO_EMAIL = 'demo@kssports.test';
 function gstin(stateCode: string, pan: string, entity = '1'): string {
   const body = `${stateCode}${pan}${entity}Z`;
   return body + gstinCheckCharacter(body);
+}
+
+async function ensureBrand(businessId: string) {
+  const business = await Business.findById(businessId);
+  if (!business) return;
+  if (business.name === 'Meera Textiles') business.name = 'KS Sports';
+  if (business.email === 'hello@meeratextiles.test') business.email = 'hello@kssports.test';
+  if (business.ownerName === 'Meera Sharma' || business.ownerName === 'Meera Textiles') business.ownerName = 'KS Sports';
+  if (business.upiId === 'meera@okaxis') business.upiId = 'kssports@okaxis';
+  if (business.bank?.accountName === 'Meera Textiles') {
+    business.bank.accountName = 'KS Sports';
+    business.markModified('bank');
+  }
+  await business.save();
+  await BusinessSettings.updateOne(
+    { businessId: business._id, 'defaults.signatory': { $in: ['Meera Sharma', 'Meera Textiles', ''] } },
+    { $set: { 'defaults.signatory': 'KS Sports' } },
+  );
+  const invoices = await Invoice.find({ businessId: business._id, 'sellerSnapshot.name': 'Meera Textiles' });
+  for (const invoice of invoices) {
+    invoice.sellerSnapshot.name = business.name;
+    invoice.sellerSnapshot.ownerName = business.ownerName;
+    invoice.sellerSnapshot.email = business.email;
+    invoice.sellerSnapshot.upiId = business.upiId || '';
+    if (!invoice.sellerSnapshot.signatory || invoice.sellerSnapshot.signatory === 'Meera Sharma' || invoice.sellerSnapshot.signatory === 'Meera Textiles') {
+      invoice.sellerSnapshot.signatory = 'KS Sports';
+    }
+    if (invoice.sellerSnapshot.bank?.accountName === 'Meera Textiles') {
+      invoice.sellerSnapshot.bank.accountName = 'KS Sports';
+      invoice.markModified('sellerSnapshot');
+    }
+    invoice.markModified('sellerSnapshot');
+    await invoice.save();
+  }
 }
 
 async function ensureLogo(businessId: string) {
@@ -92,10 +126,7 @@ export async function seedDemo(): Promise<void> {
   }
   const existing = await User.findOne({ email: DEMO_EMAIL });
   if (existing?.businessId) {
-    await Business.updateOne(
-      { _id: existing.businessId, name: 'Meera Textiles' },
-      { $set: { name: 'KS Sports', email: 'hello@kssports.test' } },
-    );
+    await ensureBrand(String(existing.businessId));
     await ensureSports(String(existing.businessId));
     await ensureLogo(String(existing.businessId));
     return;
@@ -120,7 +151,7 @@ export async function seedDemo(): Promise<void> {
     pincode: '302003',
     gstin: gstin('08', pan),
     pan,
-    upiId: 'meera@okaxis',
+    upiId: 'kssports@okaxis',
     bank: {
       bankName: 'State Bank of India',
       accountName: 'KS Sports',
@@ -298,6 +329,7 @@ export async function seedDemo(): Promise<void> {
     items: [line(cloth, 4)],
   });
   await ensureSports(businessId);
+  await ensureBrand(businessId);
   await ensureLogo(businessId);
   }
 
