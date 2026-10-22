@@ -26,7 +26,10 @@ export function signToken(user: { id: string; tokenVersion: number; role: string
 
 function secureCookie(req: Request): boolean {
   const origin = req.get('origin') || req.get('referer') || '';
-  return config.cookieSecure || req.secure || origin.startsWith('https://');
+  const forwarded = (req.get('x-forwarded-proto') || '').split(',')[0]?.trim();
+  const host = req.get('host') || '';
+  const previewHost = host.endsWith('.cvm.dev') || host.endsWith('.cursor.com');
+  return config.cookieSecure || req.secure || origin.startsWith('https://') || forwarded === 'https' || previewHost;
 }
 
 function cookieOptions(req: Request) {
@@ -36,13 +39,12 @@ function cookieOptions(req: Request) {
     secure,
     sameSite: (secure ? 'none' : 'lax') as 'none' | 'lax',
     path: '/',
+    ...(secure ? { partitioned: true } : {}),
   };
 }
 
 export function setAuthCookie(req: Request, res: Response, token: string): void {
   const options = cookieOptions(req);
-  res.clearCookie('lekha_session', { path: '/', httpOnly: true, sameSite: 'lax', secure: false });
-  res.clearCookie('lekha_session', { path: '/', httpOnly: true, sameSite: 'none', secure: true });
   res.cookie('lekha_session', token, { ...options, maxAge: 7 * 24 * 60 * 60 * 1000 });
 }
 
@@ -50,6 +52,8 @@ export function clearAuthCookie(req: Request, res: Response): void {
   const options = cookieOptions(req);
   res.clearCookie('lekha_session', options);
   res.clearCookie('lekha_session', { path: '/', httpOnly: true, sameSite: 'lax', secure: false });
+  res.clearCookie('lekha_session', { path: '/', httpOnly: true, sameSite: 'none', secure: true });
+  res.clearCookie('lekha_session', { path: '/', httpOnly: true, sameSite: 'none', secure: true, partitioned: true });
 }
 
 function readToken(req: Request): string | null {

@@ -6,7 +6,7 @@ import { useAuth, useMeta } from '../auth';
 import { CustomerFields } from '../components/CustomerFields';
 import { StateSelect } from '../components/StateSelect';
 import { Badge, Button, Dialog, Field, PageHeader, SelectInput, Spinner, TextArea, TextInput } from '../components/ui';
-import { api } from '../lib/api';
+import { api, authHeader } from '../lib/api';
 import { customerPayload, emptyCustomer, type CustomerDraft } from '../lib/customer';
 import { addDays, inr, todayIn } from '../lib/format';
 import { fail, fieldErrors } from '../lib/toast';
@@ -327,7 +327,7 @@ export function InvoiceForm() {
       const response = await fetch('/api/invoices/preview', {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeader() },
         body: JSON.stringify({ ...body(ready ? 'unpaid' : 'draft'), ...(id ? { invoiceId: id } : {}) }),
       });
       const html = await response.text();

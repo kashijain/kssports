@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { api } from './lib/api';
+import { api, clearAuthToken } from './lib/api';
 import type { Business, Meta, Settings, User } from './types';
 
 interface Session {
@@ -51,10 +51,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSettings(next.settings);
       },
       logout: async () => {
-        await api('/api/auth/logout', { method: 'POST' });
-        setUser(null);
-        setBusiness(null);
-        setSettings(null);
+        try {
+          await api('/api/auth/logout', { method: 'POST' });
+        } finally {
+          clearAuthToken();
+          setUser(null);
+          setBusiness(null);
+          setSettings(null);
+        }
       },
     }),
     [user, business, settings, loading],

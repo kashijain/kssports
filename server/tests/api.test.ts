@@ -88,6 +88,9 @@ describe('billing API', () => {
     expect(oldLogin.status).toBe(401);
     const newLogin = await request(app).post('/api/auth/login').send({ email: 'asha@shop.test', password: 'Changed123' });
     expect(newLogin.status).toBe(200);
+    expect(newLogin.body.token).toEqual(expect.any(String));
+    const withoutCookie = await request(app).get('/api/customers').set('Authorization', `Bearer ${newLogin.body.token}`);
+    expect(withoutCookie.status).toBe(200);
   });
 
   it('calculates intra-state and inter-state invoices and keeps history frozen', async () => {
