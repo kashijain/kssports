@@ -3,7 +3,7 @@ import { toast } from 'sonner';
 import { DocumentFileLink } from '../components/DocumentFileLink';
 import { StateSelect } from '../components/StateSelect';
 import { Badge, Button, Dialog, Empty, Field, PageHeader, SelectInput, Spinner, TextInput } from '../components/ui';
-import { api } from '../lib/api';
+import { api, downloadFile } from '../lib/api';
 import { inr, prettyDate } from '../lib/format';
 import { fail } from '../lib/toast';
 import type { Product, TaxRate } from '../types';
@@ -39,6 +39,7 @@ export function Purchases() {
   const [qty, setQty] = useState('1');
   const [price, setPrice] = useState('');
   const [gst, setGst] = useState('18');
+  const [billFile, setBillFile] = useState<File | null>(null);
 
   function load() {
     api<{ purchases: Purchase[] }>('/api/purchases')
@@ -58,7 +59,7 @@ export function Purchases() {
     const product = products.find((item) => item.id === productId);
     setBusy(true);
     try {
-      await api('/api/purchases', {
+      const created = await api<{ purchase: Purchase }>('/api/purchases', {
         method: 'POST',
         body: JSON.stringify({
           supplier,
@@ -76,7 +77,18 @@ export function Purchases() {
           }],
         }),
       });
-      toast.success('Purchase saved. Stock has been increased.');
+      if (billFile) {
+        try {
+          await attachBill(created.purchase.id, billFile);
+          toast.success('Purchase saved and the supplier bill is attached.');
+        } catch (error) {
+          toast.success('Purchase saved.');
+          fail(error);
+        }
+      } else {
+        toast.success('Purchase saved. Stock has been increased.');
+      }
+      setBillFile(null);
       setOpen(false);
       load();
     } catch (error) {
@@ -92,15 +104,27 @@ export function Purchases() {
     setDocs(data.documents);
   }
 
-  async function uploadBill(file: File, replaceId?: string) {
-    if (!selected) return;
+  async function attachBill(purchaseId: string, file: File, replaceId?: string) {
     const body = new FormData();
     body.append('file', file);
     if (replaceId) body.append('replaceId', replaceId);
+    await api(`/api/purchases/${purchaseId}/bill`, { method: 'POST', body });
+  }
+
+  async function downloadList(format: 'csv' | 'pdf') {
     try {
-      await api(`/api/purchases/${selected.id}/bill`, { method: 'POST', body });
+      await downloadFile(`/api/purchases/download?format=${format}`, `ks-sports-wholesale-purchases.${format}`);
+    } catch (error) {
+      fail(error);
+    }
+  }
+
+  async function uploadBill(purchaseId: string, file: File, replaceId?: string) {
+    try {
+      await attachBill(purchaseId, file, replaceId);
       toast.success('Supplier bill attached.');
-      await openPurchase(selected);
+      load();
+      if (selected?.id === purchaseId) await openPurchase(selected);
     } catch (error) {
       fail(error);
     }
@@ -108,13 +132,26 @@ export function Purchases() {
 
   return (
     <div>
-      <PageHeader title="Wholesale purchases" lede="Money going out to suppliers. A saved purchase increases stock and keeps the supplier bill with that record." action={<Button onClick={() => setOpen(true)}>New purchase</Button>} />
+      <PageHeader
+        title="Wholesale purchases"
+        lede="Money going out to suppliers. Save the purchase, then keep the bill you received from them on the same record."
+        action={
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" onClick={() => void downloadList('csv')}>Download CSV</Button>
+            <Button variant="secondary" onClick={() => void downloadList('pdf')}>Download PDF</Button>
+            <Button onClick={() => setOpen(true)}>New purchase</Button>
+          </div>
+        }
+      />
+      <p className="mb-4 max-w-3xl text-sm text-muted">
+        Total profit is not this purchase total. It is counted when the goods are sold: the taxable sale amount minus the purchase cost saved on that bill. Shop expenses are subtracted after that. The Profit report shows the total.
+      </p>
       {!rows ? <Spinner /> : null}
       {rows && rows.length === 0 ? <Empty title="No purchases yet" body="Record a supplier invoice when stock arrives." action={<Button onClick={() => setOpen(true)}>New purchase</Button>} /> : null}
       {rows && rows.length > 0 ? (
         <div className="overflow-x-auto rounded-3xl border border-line bg-card">
           <table className="w-full min-w-[720px] text-left text-sm">
-            <thead className="text-xs uppercase text-muted"><tr><th className="px-4 py-3">Purchase</th><th>Supplier</th><th>Their invoice</th><th>Date</th><th>Total</th><th>Due</th><th>Status</th></tr></thead>
+            <thead className="text-xs uppercase text-muted"><tr><th className="px-4 py-3">Purchase</th><th>Supplier</th><th>Their invoice</th><th>Date</th><th>Total</th><th>Due</th><th>Their bill</th><th>Status</th></tr></thead>
             <tbody>
               {rows.map((row) => (
                 <tr key={row.id} className="cursor-pointer border-t border-line" onClick={() => void openPurchase(row)}>
@@ -124,6 +161,19 @@ export function Purchases() {
                   <td>{prettyDate(row.purchaseDate)}</td>
                   <td>{inr(row.totals?.grandTotal)}</td>
                   <td>{inr(row.amountDue)}</td>
+                  <td onClick={(event) => event.stopPropagation()}>
+                    {row.documents?.[0] ? (
+                      <span className="flex flex-wrap gap-3">
+                        <DocumentFileLink id={row.documents[0].id} name={row.documents[0].name} mode="view" className="font-semibold">View</DocumentFileLink>
+                        <DocumentFileLink id={row.documents[0].id} name={row.documents[0].name} mode="download" className="font-semibold">Download</DocumentFileLink>
+                      </span>
+                    ) : (
+                      <label className="cursor-pointer font-semibold text-clay-dark">
+                        Upload bill
+                        <input type="file" accept="application/pdf,image/jpeg,image/png,.pdf,.jpg,.jpeg,.png" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadBill(row.id, file); event.target.value = ''; }} />
+                      </label>
+                    )}
+                  </td>
                   <td><Badge status={row.status} label={row.status} /></td>
                 </tr>
               ))}
@@ -146,14 +196,14 @@ export function Purchases() {
               <DocumentFileLink id={doc.id} name={doc.name} mode="download" className="inline font-semibold">Download</DocumentFileLink>
               <label className="cursor-pointer font-semibold">
                 Replace
-                <input type="file" accept="application/pdf,image/jpeg,image/png" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadBill(file, doc.id); }} />
+                <input type="file" accept="application/pdf,image/jpeg,image/png,.pdf,.jpg,.jpeg,.png" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadBill(selected.id, file, doc.id); event.target.value = ''; }} />
               </label>
               <button type="button" className="text-clay-dark" onClick={() => void api(`/api/documents/${doc.id}`, { method: 'DELETE' }).then(() => openPurchase(selected)).catch(fail)}>Delete</button>
             </div>
           ))}
           <label className="mt-3 inline-flex cursor-pointer rounded-full bg-clay px-4 py-2 text-sm font-semibold text-white">
             Upload supplier bill
-            <input type="file" accept="application/pdf,image/jpeg,image/png" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadBill(file); }} />
+            <input type="file" accept="application/pdf,image/jpeg,image/png,.pdf,.jpg,.jpeg,.png" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadBill(selected.id, file); event.target.value = ''; }} />
           </label>
         </section>
       ) : null}
@@ -170,6 +220,13 @@ export function Purchases() {
           <Field label="GSTIN"><TextInput value={supplier.gstin} onChange={(event) => setSupplier({ ...supplier, gstin: event.target.value.toUpperCase() })} /></Field>
           {suppliers.length ? <p className="text-xs text-muted sm:col-span-2">Saved suppliers: {suppliers.map((item) => item.name).join(', ')}</p> : null}
           <Field label="Supplier invoice number"><TextInput value={invoiceNo} onChange={(event) => setInvoiceNo(event.target.value)} required /></Field>
+          <Field label="Supplier's bill">
+            <label className="flex cursor-pointer items-center justify-between gap-3 rounded-2xl border border-line px-3 py-2">
+              <span className="truncate text-sm">{billFile ? billFile.name : 'PDF or photo of the bill you received'}</span>
+              <span className="shrink-0 text-sm font-semibold text-clay-dark">{billFile ? 'Change' : 'Choose file'}</span>
+              <input type="file" accept="application/pdf,image/jpeg,image/png,.pdf,.jpg,.jpeg,.png" className="hidden" onChange={(event) => setBillFile(event.target.files?.[0] || null)} />
+            </label>
+          </Field>
           <Field label="Purchase date"><TextInput type="date" value={date} onChange={(event) => setDate(event.target.value)} required /></Field>
           <Field label="Product">
             <SelectInput value={productId} onChange={(event) => {

@@ -7,6 +7,7 @@ import { requireAuth, setAuthCookie, clearAuthCookie, signToken } from '../middl
 import { Business, BusinessSettings, User } from '../models.js';
 import { presentBusiness, presentSettings, presentUser } from '../present.js';
 import { changePasswordSchema, forgotSchema, loginSchema, registerSchema, resetSchema } from '../schemas.js';
+import { shopLoginAllowed } from '../shopAccess.js';
 import { parseBody } from '../validate.js';
 
 export const authRouter = Router();
@@ -24,6 +25,7 @@ async function session(user: InstanceType<typeof User>) {
 authRouter.post(
   '/register',
   asyncHandler(async (req, res) => {
+    if (!config.isTest) throw new HttpError(403, 'New accounts are closed. Sign in with the KS Sports login.');
     const body = parseBody(registerSchema, req.body);
     const email = body.email.toLowerCase();
     if (await User.exists({ email })) throw new HttpError(409, 'An account with this email already exists.');
@@ -43,7 +45,8 @@ authRouter.post(
   '/login',
   asyncHandler(async (req, res) => {
     const body = parseBody(loginSchema, req.body);
-    const user = await User.findOne({ email: body.email.toLowerCase() });
+    const email = body.email.toLowerCase();
+    const user = shopLoginAllowed(email) ? await User.findOne({ email }) : null;
     const match = user ? await bcrypt.compare(body.password, user.passwordHash) : false;
     if (!user || !match) throw new HttpError(401, 'Email or password is incorrect.');
     const token = signToken({ id: String(user._id), tokenVersion: user.tokenVersion, role: user.role });
@@ -76,7 +79,7 @@ authRouter.post(
     const body = parseBody(forgotSchema, req.body);
     const user = await User.findOne({ email: body.email.toLowerCase() });
     let resetUrl: string | undefined;
-    if (user) {
+    if (user && shopLoginAllowed(user.email)) {
       const token = crypto.randomBytes(32).toString('hex');
       user.resetTokenHash = crypto.createHash('sha256').update(token).digest('hex');
       user.resetTokenExpires = new Date(Date.now() + 60 * 60 * 1000);
@@ -100,7 +103,7 @@ authRouter.post(
       resetTokenHash: hash,
       resetTokenExpires: { $gt: new Date() },
     });
-    if (!user) throw new HttpError(400, 'This reset link is invalid or has expired.');
+    if (!user || !shopLoginAllowed(user.email)) throw new HttpError(400, 'This reset link is invalid or has expired.');
     user.passwordHash = await bcrypt.hash(body.password, 10);
     user.tokenVersion += 1;
     user.resetTokenHash = '';

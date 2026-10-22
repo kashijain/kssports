@@ -68,7 +68,7 @@ async function errorFrom(response: Response): Promise<ApiError> {
       message = data?.error?.message || message;
       fields = data?.error?.fields;
     } catch {
-      if (response.status === 503) message = 'The PDF engine is unavailable. You can still print from the preview.';
+      if (response.status === 503) message = 'The PDF could not be created.';
     }
   }
   return new ApiError(message, response.status, fields);

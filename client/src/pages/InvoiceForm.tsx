@@ -615,21 +615,29 @@ export function InvoiceForm() {
 
           {!editing ? (
             <section className="rounded-3xl border border-line bg-card p-4">
-              <Field label="Payment status">
+              <Field label="Money received">
                 <SelectInput value={payStatus} onChange={(event) => setPayStatus(event.target.value as 'unpaid' | 'partial' | 'paid')}>
-                  <option value="unpaid">Unpaid</option>
-                  <option value="partial">Partially paid</option>
-                  <option value="paid">Paid</option>
+                  <option value="unpaid">Just create the bill</option>
+                  <option value="partial">Advance received</option>
+                  <option value="paid">Whole bill paid</option>
                 </SelectInput>
               </Field>
-              {payStatus !== 'unpaid' ? (
+              {payStatus === 'unpaid' ? (
+                <p className="mt-3 text-sm text-muted">Nothing is marked received. After you save, print a copy for the shop or send the bill to the customer.</p>
+              ) : (
                 <div className="mt-3 grid gap-2">
                   {payStatus === 'partial' ? (
-                    <Field label="Amount received">
-                      <TextInput inputMode="decimal" value={payAmount} onChange={(event) => setPayAmount(event.target.value)} />
-                    </Field>
+                    <>
+                      <Field label="Advance amount">
+                        <TextInput inputMode="decimal" value={payAmount} onChange={(event) => setPayAmount(event.target.value)} />
+                      </Field>
+                      <p className="text-sm text-muted">
+                        The rest stays due
+                        {calc ? `: ${inr(Math.max(0, (calc.grandTotal || 0) - (Number(payAmount) || 0)))}` : ''}. You can record it later.
+                      </p>
+                    </>
                   ) : (
-                    <p className="text-sm text-muted">Records {inr(calc?.grandTotal)} as received.</p>
+                    <p className="text-sm text-muted">The whole bill, {inr(calc?.grandTotal)}, is marked received.</p>
                   )}
                   <Field label="Method">
                     <SelectInput value={payMethod} onChange={(event) => setPayMethod(event.target.value)}>
@@ -644,7 +652,7 @@ export function InvoiceForm() {
                     <TextInput value={payRef} onChange={(event) => setPayRef(event.target.value)} placeholder="UPI ref, cheque no." />
                   </Field>
                 </div>
-              ) : null}
+              )}
             </section>
           ) : (
             <p className="text-xs text-muted">Payments already on this invoice stay as they are. Record a new one from the invoice page.</p>

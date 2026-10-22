@@ -7,7 +7,9 @@ import { requireAuth, requireBusiness } from '../middleware/auth.js';
 import { Business, BusinessSettings, Invoice, Payment } from '../models.js';
 import { presentInvoiceListItem, presentPayment } from '../present.js';
 import { calculateSchema, cancelSchema, invoiceSchema, recordPaymentSchema } from '../schemas.js';
-import { htmlToPdf } from '../services/pdf.js';
+import { withPdf } from '../services/pdf.js';
+import { invoiceToPdf } from '../services/shopPdf.js';
+import { toInvoiceView } from '../services/invoiceView.js';
 import {
   cancelInvoice,
   createInvoice,
@@ -165,7 +167,10 @@ invoiceRouter.get(
   asyncHandler(async (req, res) => {
     const invoice = await Invoice.findOne({ _id: req.params.id, businessId: req.auth!.businessId });
     if (!invoice) throw new HttpError(404, 'Invoice not found.');
-    const pdf = await htmlToPdf(await renderStoredInvoice(invoice));
+    const pdf = await withPdf(
+      () => renderStoredInvoice(invoice),
+      () => invoiceToPdf(toInvoiceView(invoice)),
+    );
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${invoice.number}.pdf"`);
     res.send(pdf);
@@ -256,7 +261,10 @@ publicRouter.get(
   asyncHandler(async (req, res) => {
     const invoice = await Invoice.findOne({ shareToken: req.params.token });
     if (!invoice || invoice.status === 'draft') throw new HttpError(404, 'This invoice link is not available.');
-    const pdf = await htmlToPdf(await renderStoredInvoice(invoice));
+    const pdf = await withPdf(
+      () => renderStoredInvoice(invoice),
+      () => invoiceToPdf(toInvoiceView(invoice)),
+    );
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${invoice.number}.pdf"`);
     res.send(pdf);

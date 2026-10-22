@@ -4,7 +4,7 @@ import { Shell } from './components/Shell';
 import { Spinner } from './components/ui';
 import { CustomerDetail, Customers } from './pages/Customers';
 import { Dashboard } from './pages/Dashboard';
-import { Forgot, Login, Register, Reset } from './pages/AuthPages';
+import { Forgot, Login, Reset } from './pages/AuthPages';
 import { InvoiceForm } from './pages/InvoiceForm';
 import { InvoiceView } from './pages/InvoiceView';
 import { Invoices } from './pages/Invoices';
@@ -25,7 +25,7 @@ export function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
+      <Route path="/register" element={<Navigate to="/login" replace />} />
       <Route path="/forgot" element={<Forgot />} />
       <Route path="/reset/:token" element={<Reset />} />
       <Route path="/share/:token" element={<SharePage />} />

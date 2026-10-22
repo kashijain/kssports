@@ -50,72 +50,11 @@ export function Login() {
         <Button type="submit" disabled={busy}>
           {busy ? 'Signing in…' : 'Sign in'}
         </Button>
-        <div className="flex justify-between text-sm">
+        <div className="text-sm">
           <Link to="/forgot" className="text-clay-dark underline">
             Forgot password
           </Link>
-          <Link to="/register" className="font-semibold">
-            Create an account
-          </Link>
         </div>
-        <p className="rounded-2xl bg-amber px-3 py-2 text-xs text-ink">
-          Try the sample business with <span className="font-semibold">demo@kssports.test</span> and <span className="font-semibold">Demo@12345</span>.
-        </p>
-      </form>
-    </AuthFrame>
-  );
-}
-
-export function Register() {
-  const { setSession, user, loading } = useAuth();
-  const navigate = useNavigate();
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [busy, setBusy] = useState(false);
-
-  if (!loading && user) return <Redirect home="/" />;
-
-  async function submit(event: React.FormEvent) {
-    event.preventDefault();
-    setBusy(true);
-    setErrors({});
-    try {
-      const session = await api<{ user: User; business: Business | null; settings: Settings | null }>('/api/auth/register', {
-        method: 'POST',
-        body: JSON.stringify({ name, email, password }),
-      });
-      setSession(session);
-      toast.success('Account created. Add your shop details next.');
-      navigate('/setup', { replace: true });
-    } catch (error) {
-      setErrors(fieldErrors(error));
-      fail(error);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <AuthFrame title="Create your account" lede="One owner login for your customers, products, and bills.">
-      <form onSubmit={submit} className="grid gap-3">
-        <Field label="Your name" error={errors.name}>
-          <TextInput value={name} onChange={(event) => setName(event.target.value)} required />
-        </Field>
-        <Field label="Email" error={errors.email}>
-          <TextInput type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
-        </Field>
-        <Field label="Password" error={errors.password}>
-          <TextInput type="password" autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} required />
-        </Field>
-        <p className="text-xs text-muted">Use at least 8 characters, with a letter and a number.</p>
-        <Button type="submit" disabled={busy}>
-          {busy ? 'Creating…' : 'Create account'}
-        </Button>
-        <Link to="/login" className="text-sm font-semibold">
-          I already have an account
-        </Link>
       </form>
     </AuthFrame>
   );

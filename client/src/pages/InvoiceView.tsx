@@ -5,7 +5,7 @@ import { useMeta } from '../auth';
 import { AuthenticatedHtmlFrame } from '../components/AuthenticatedHtmlFrame';
 import { InvoiceActions } from '../components/InvoiceActions';
 import { Badge, Button, Dialog, Field, PageHeader, SelectInput, Spinner, TextArea, TextInput } from '../components/ui';
-import { api } from '../lib/api';
+import { api, openAuthenticated } from '../lib/api';
 import { inr, prettyDate, todayIn } from '../lib/format';
 import { fail } from '../lib/toast';
 import type { InvoiceDetail } from '../types';
@@ -109,6 +109,14 @@ export function InvoiceView() {
     toast.success('Link copied.');
   }
 
+  async function printCopy() {
+    try {
+      await openAuthenticated(`/api/invoices/${id}/html?print=1`);
+    } catch (err) {
+      fail(err);
+    }
+  }
+
   if (error) return <EmptyFallback body={error} onRetry={load} />;
   if (!invoice) return <Spinner />;
 
@@ -134,6 +142,13 @@ export function InvoiceView() {
       <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
         <AuthenticatedHtmlFrame path={`/api/invoices/${invoice.id}/html`} title={invoice.number} className="min-h-[900px] w-full rounded-3xl border border-line bg-white" />
         <aside className="grid gap-3">
+          {invoice.status !== 'cancelled' ? (
+            <section className="grid gap-2 rounded-3xl border border-line bg-card p-4">
+              <h2 className="font-serif text-2xl">Shop copy</h2>
+              <p className="text-sm text-muted">Print this bill for the counter. Sending it to the customer is below.</p>
+              <Button variant="secondary" onClick={() => void printCopy()}>Print a copy</Button>
+            </section>
+          ) : null}
           <section className="rounded-3xl border border-line bg-card p-4 text-sm">
             <Row label="Total" value={inr(invoice.totals.grandTotal)} />
             <Row label="Paid" value={inr(invoice.amountPaid)} />
@@ -198,7 +213,7 @@ export function InvoiceView() {
 
           {invoice.status !== 'draft' ? (
             <section className="rounded-3xl border border-line bg-card p-4 text-sm">
-              <h2 className="font-serif text-2xl">Share</h2>
+              <h2 className="font-serif text-2xl">Send to customer</h2>
               <p className="mt-2 break-all text-xs text-muted">{shareUrl}</p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <Button variant="secondary" onClick={() => void copyLink()}>

@@ -1,9 +1,11 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import { statusLabel } from '../domain/constants.js';
 import { todayKey } from '../domain/dates.js';
 import { asyncHandler, HttpError } from '../http.js';
 import { requireAuth, requireBusiness } from '../middleware/auth.js';
 import {
+  Business,
   BusinessSettings,
   DocumentFile,
   Expense,
@@ -16,7 +18,9 @@ import {
 } from '../models.js';
 import { presentInvoiceListItem } from '../present.js';
 import { discardRejectedUpload, documentUpload, publicAssetUrl, removeUpload, storedPublicImage, upload } from '../services/files.js';
-import { htmlToPdf } from '../services/pdf.js';
+import { withPdf } from '../services/pdf.js';
+import { purchaseRegisterPdf, renderCatalogPdf } from '../services/shopPdf.js';
+import { toCsv } from '../services/reports.js';
 import {
   cancelPurchase,
   catalogProducts,
@@ -151,6 +155,41 @@ opsRouter.post(
 );
 
 opsRouter.get(
+  '/purchases/download',
+  asyncHandler(async (req, res) => {
+    const rows = await Purchase.find({ businessId: req.auth!.businessId }).sort({ purchaseDateKey: 1, number: 1 });
+    const business = await Business.findById(req.auth!.businessId);
+    const list = rows.map((row) => ({
+      number: row.number,
+      supplier: row.supplierSnapshot?.name || row.supplierSnapshot?.company || '',
+      invoice: row.supplierInvoice || '',
+      date: row.purchaseDateKey,
+      total: row.totals?.grandTotal || 0,
+      due: row.amountDue || 0,
+      status: statusLabel(row.status),
+    }));
+    const format = String(req.query.format || 'pdf');
+    if (format === 'csv') {
+      const csv = toCsv(
+        ['Purchase', 'Supplier', 'Their invoice', 'Date', 'Total', 'Due', 'Status'],
+        [
+          ...list.map((row) => [row.number, row.supplier, row.invoice, row.date, row.total, row.due, row.status]),
+          ['', '', '', 'Total', list.reduce((sum, row) => sum + row.total, 0), list.reduce((sum, row) => sum + row.due, 0), ''],
+        ],
+      );
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', 'attachment; filename="ks-sports-wholesale-purchases.csv"');
+      res.send(csv);
+      return;
+    }
+    const pdf = await purchaseRegisterPdf(business?.name || 'KS Sports', list);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename="ks-sports-wholesale-purchases.pdf"');
+    res.send(pdf);
+  }),
+);
+
+opsRouter.get(
   '/purchases/:id',
   asyncHandler(async (req, res) => {
     const purchase = await Purchase.findOne({ _id: req.params.id, businessId: req.auth!.businessId });
@@ -227,7 +266,10 @@ opsRouter.get(
   asyncHandler(async (req, res) => {
     const query = catalogQuery(req.query as Record<string, unknown>);
     const products = await catalogProducts(req.auth!.businessId!, query);
-    const pdf = await htmlToPdf(await renderCatalogHtml(req.auth!.businessId!, products, false, query.priceMode));
+    const pdf = await withPdf(
+      () => renderCatalogHtml(req.auth!.businessId!, products, false, query.priceMode),
+      () => renderCatalogPdf(req.auth!.businessId!, products, query.priceMode),
+    );
     const filename = query.priceMode === 'wholesale' ? 'ks-sports-wholesale-catalog.pdf' : query.priceMode === 'retail' ? 'ks-sports-retail-catalog.pdf' : 'ks-sports-catalog.pdf';
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);

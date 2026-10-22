@@ -2,7 +2,8 @@ import { Router } from 'express';
 import { asyncHandler } from '../http.js';
 import { requireAuth, requireBusiness } from '../middleware/auth.js';
 import { Customer, Invoice, Product } from '../models.js';
-import { htmlToPdf } from '../services/pdf.js';
+import { withPdf } from '../services/pdf.js';
+import { textPdf } from '../services/shopPdf.js';
 import {
   customerReport,
   dashboard,
@@ -105,7 +106,10 @@ async function sendReport(
     const html = `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title>
       <style>body{font-family:Inter,sans-serif;padding:24px;color:#1c1915} table{width:100%;border-collapse:collapse} td,th{border-bottom:1px solid #e6dfd2;padding:6px;text-align:left;font-size:12px} h1{font-family:Georgia,serif}</style>
       </head><body><h1>${title}</h1><pre>${escapeHtml(JSON.stringify(payload, null, 2))}</pre></body></html>`;
-    const pdf = await htmlToPdf(html);
+    const pdf = await withPdf(
+      async () => html,
+      () => textPdf(title, (csv || JSON.stringify(payload, null, 2)).split(/\r?\n/)),
+    );
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}.pdf"`);
     res.type('application/pdf').send(pdf);

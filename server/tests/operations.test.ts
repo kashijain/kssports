@@ -141,9 +141,33 @@ describe('KS Sports operations', () => {
     expect(wholesale.text).toContain('Wholesale price: ₹1,400.00');
     expect(wholesale.text).not.toContain('Retail price');
 
+    const register = await agent.get('/api/purchases/download?format=csv');
+    expect(register.status).toBe(200);
+    expect(register.headers['content-type']).toContain('csv');
+    expect(register.text).toContain('Purchase');
+    const savedChrome = config.chromePath;
+    config.chromePath = '';
+    const registerPdf = await agent.get('/api/purchases/download').buffer(true);
+    config.chromePath = savedChrome;
+    expect(registerPdf.status).toBe(200);
+    expect(registerPdf.headers['content-type']).toContain('pdf');
+    expect(registerPdf.body.subarray(0, 4).toString()).toBe('%PDF');
+
     const pdf = await agent.get(`/api/catalog/pdf?ids=${product.body.product.id}`).buffer(true);
     expect(pdf.status).toBe(200);
     expect(pdf.body.subarray(0, 4).toString()).toBe('%PDF');
+
+    const previousChrome = config.chromePath;
+    config.chromePath = '';
+    try {
+      const plain = await agent.get(`/api/catalog/pdf?priceMode=retail&ids=${product.body.product.id}`).buffer(true);
+      expect(plain.status).toBe(200);
+      expect(plain.headers['content-type']).toContain('pdf');
+      expect(plain.body.subarray(0, 4).toString()).toBe('%PDF');
+      expect(plain.body.length).toBeGreaterThan(800);
+    } finally {
+      config.chromePath = previousChrome;
+    }
 
     const purchase = await agent.post('/api/purchases').send({
       supplier: { name: 'ABC Sports Pvt Ltd', stateCode: '08' },
@@ -153,6 +177,9 @@ describe('KS Sports operations', () => {
       items: [{ name: 'Batting Gloves', quantity: 4, purchasePrice: 900, gstRate: 12 }],
     });
     expect(purchase.status).toBe(201);
+    const filled = await agent.get('/api/purchases/download?format=csv');
+    expect(filled.text).toContain(purchase.body.purchase.number);
+    expect(filled.text).toContain('ABC Sports Pvt Ltd');
     const bill = await agent
       .post(`/api/purchases/${purchase.body.purchase.id}/bill`)
       .attach('file', Buffer.from('%PDF-1.4\n%%EOF'), { filename: 'ABC_Sports_Invoice_1054.pdf', contentType: 'application/pdf' });

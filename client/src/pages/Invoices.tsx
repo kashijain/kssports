@@ -64,7 +64,7 @@ export function Invoices() {
           <option value="">All statuses</option>
           <option value="draft">Draft</option>
           <option value="unpaid">Unpaid</option>
-          <option value="partial">Partially paid</option>
+          <option value="partial">Advance / part paid</option>
           <option value="paid">Paid</option>
           <option value="cancelled">Cancelled</option>
         </SelectInput>

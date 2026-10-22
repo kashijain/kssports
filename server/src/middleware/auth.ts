@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { config } from '../config.js';
 import { HttpError } from '../http.js';
 import { User } from '../models.js';
+import { shopLoginAllowed } from '../shopAccess.js';
 
 export interface AuthInfo {
   id: string;
@@ -74,7 +75,9 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
       throw new HttpError(401, 'Your session has ended. Sign in again.');
     }
     const user = await User.findById(payload.sub);
-    if (!user || user.tokenVersion !== payload.tv) throw new HttpError(401, 'Your session has ended. Sign in again.');
+    if (!user || user.tokenVersion !== payload.tv || !shopLoginAllowed(user.email)) {
+      throw new HttpError(401, 'Your session has ended. Sign in again.');
+    }
     req.auth = {
       id: String(user._id),
       email: user.email,

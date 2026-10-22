@@ -268,6 +268,16 @@ describe('billing API', () => {
     expect(pdf.status, pdf.text?.slice?.(0, 200) || pdf.body?.toString?.().slice(0, 120)).toBe(200);
     expect(pdf.headers['content-type']).toContain('pdf');
     expect(pdf.body.subarray(0, 4).toString()).toBe('%PDF');
+    const previousChrome = config.chromePath;
+    config.chromePath = '';
+    try {
+      const plain = await agent.get(`/api/invoices/${invoice.body.invoice.id}/pdf`).buffer(true);
+      expect(plain.status, plain.body?.toString?.().slice(0, 300)).toBe(200);
+      expect(plain.body.subarray(0, 4).toString()).toBe('%PDF');
+      expect(plain.body.length).toBeGreaterThan(800);
+    } finally {
+      config.chromePath = previousChrome;
+    }
   });
 });
 
