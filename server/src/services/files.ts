@@ -1,8 +1,18 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import multer from 'multer';
-import { uploadsDir } from '../config.js';
+import { rootDir, uploadsDir } from '../config.js';
 import { HttpError } from '../http.js';
+
+const brandLogoFile = path.join(rootDir, 'server/assets/ks-logo.png');
+let brandLogoCache = '';
+
+export async function brandLogoDataUrl(): Promise<string> {
+  if (brandLogoCache) return brandLogoCache;
+  const buf = await fs.promises.readFile(brandLogoFile);
+  brandLogoCache = `data:image/png;base64,${buf.toString('base64')}`;
+  return brandLogoCache;
+}
 
 export async function readDataUrl(relativePath: string): Promise<string> {
   if (!relativePath || relativePath.includes('..')) return '';

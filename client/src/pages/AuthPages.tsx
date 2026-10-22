@@ -213,7 +213,7 @@ function AuthFrame({ title, lede, children }: { title: string; lede: string; chi
     <div className="grid min-h-screen md:grid-cols-2">
       <section className="hidden flex-col justify-between bg-sidebar p-10 text-paper md:flex">
         <div>
-          <img src="/mark.svg" alt="" className="h-14 w-14" />
+          <img src="/logo.png" alt="KS Sports" className="h-16 w-16 rounded-full object-cover" />
           <p className="mt-4 font-serif text-5xl">KS Sports</p>
           <p className="mt-3 max-w-sm text-paper/70">Purchases, stock, retail bills, machines, and the cost of running the workshop.</p>
         </div>

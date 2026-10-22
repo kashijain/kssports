@@ -27,7 +27,7 @@ export function presentBusiness(business: Loose) {
     state: business.state || '',
     stateCode: business.stateCode || '',
     pincode: business.pincode || '',
-    logoUrl: business.logoPath ? `/uploads/${business.logoPath}` : '',
+    logoUrl: business.logoPath ? `/uploads/${business.logoPath}` : '/logo.png',
     signatureUrl: business.signaturePath ? `/uploads/${business.signaturePath}` : '',
     bank: business.bank?.bankName ? business.bank : null,
     upiId: business.upiId || '',

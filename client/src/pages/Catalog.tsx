@@ -117,7 +117,7 @@ export function Catalog() {
         {visible.map((product) => (
           <label key={product.id} className="rounded-3xl border border-line bg-card p-4">
             <div className="mb-3 flex aspect-[4/3] items-center justify-center overflow-hidden rounded-2xl bg-paper">
-              {product.images?.[0]?.url ? <img src={product.images[0].url} alt="" className="h-full w-full object-cover" /> : <img src="/mark.svg" alt="" className="h-16 w-16" />}
+              {product.images?.[0]?.url ? <img src={product.images[0].url} alt="" className="h-full w-full object-cover" /> : <img src="/logo.png" alt="" className="h-16 w-16 rounded-full object-cover" />}
             </div>
             <div className="flex items-start gap-2">
               <input type="checkbox" checked={picked.includes(product.id)} onChange={(event) => setPicked((current) => event.target.checked ? [...current, product.id] : current.filter((id) => id !== product.id))} />

@@ -124,7 +124,7 @@ export function Shell() {
   return (
     <div className="min-h-screen md:grid md:grid-cols-[240px_1fr]">
       <aside className="hidden bg-sidebar text-paper md:flex md:min-h-screen md:flex-col">
-        <Brand />
+        <Brand logo={business?.logoUrl} />
         {nav}
         <p className="px-6 pb-6 text-xs text-paper/50">{business?.name}</p>
       </aside>
@@ -134,7 +134,7 @@ export function Shell() {
           <button type="button" className="absolute inset-0 bg-ink/50" aria-label="Close menu" onClick={() => setOpen(false)} />
           <aside className="relative flex h-full w-72 flex-col bg-sidebar text-paper">
             <div className="flex items-center justify-between pr-3">
-              <Brand />
+              <Brand logo={business?.logoUrl} />
               <button type="button" aria-label="Close menu" onClick={() => setOpen(false)} className="rounded-full p-2 text-paper">
                 <X size={18} />
               </button>
@@ -222,10 +222,10 @@ export function Shell() {
   );
 }
 
-function Brand() {
+function Brand({ logo }: { logo?: string }) {
   return (
     <div className="px-5 py-5">
-      <img src="/mark.svg" alt="" className="mb-2 h-10 w-10" />
+      <img src={logo || '/logo.png'} alt="KS Sports" className="mb-2 h-14 w-14 rounded-full object-cover" />
       <p className="font-serif text-3xl text-white">KS Sports</p>
       <p className="text-xs text-paper/60">Business & billing</p>
     </div>

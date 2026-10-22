@@ -78,7 +78,7 @@ export function ProductDetail() {
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="rounded-3xl border border-line bg-card p-4">
           <div className="flex aspect-[4/3] items-center justify-center overflow-hidden rounded-2xl bg-paper">
-            {image?.url ? <img src={image.url} alt={image.alt} className="h-full w-full object-contain" /> : <img src="/mark.svg" alt="KS Sports" className="h-24 w-24" />}
+            {image?.url ? <img src={image.url} alt={image.alt} className="h-full w-full object-contain" /> : <img src="/logo.png" alt="KS Sports" className="h-24 w-24 rounded-full object-cover" />}
           </div>
           <div className="mt-3 flex gap-2">
             {(product.images || []).map((item, index) => (

@@ -1,15 +1,31 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import bcrypt from 'bcryptjs';
+import { uploadsDir } from './config.js';
 import { addDays, todayKey } from './domain/dates.js';
 import { gstinCheckCharacter } from './domain/gstin.js';
 import { Business, Customer, Product, User } from './models.js';
 import { saveBusiness, saveProduct } from './services/catalog.js';
 import { createInvoice, recordPayment } from './services/invoices.js';
 
+const logoAsset = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../assets/ks-logo.png');
+
 const DEMO_EMAIL = 'demo@kssports.test';
 
 function gstin(stateCode: string, pan: string, entity = '1'): string {
   const body = `${stateCode}${pan}${entity}Z`;
   return body + gstinCheckCharacter(body);
+}
+
+async function ensureLogo(businessId: string) {
+  const business = await Business.findById(businessId);
+  if (!business || business.logoPath) return;
+  const dir = path.join(uploadsDir, businessId);
+  fs.mkdirSync(dir, { recursive: true });
+  await fs.promises.copyFile(logoAsset, path.join(dir, 'ks-logo.png'));
+  business.logoPath = `${businessId}/ks-logo.png`;
+  await business.save();
 }
 
 async function ensureSports(businessId: string) {
@@ -81,6 +97,7 @@ export async function seedDemo(): Promise<void> {
       { $set: { name: 'KS Sports', email: 'hello@kssports.test' } },
     );
     await ensureSports(String(existing.businessId));
+    await ensureLogo(String(existing.businessId));
     return;
   }
   if (existing) return;
@@ -281,6 +298,7 @@ export async function seedDemo(): Promise<void> {
     items: [line(cloth, 4)],
   });
   await ensureSports(businessId);
+  await ensureLogo(businessId);
   }
 
 export const demoLogin = { email: DEMO_EMAIL, password: 'Demo@12345' };

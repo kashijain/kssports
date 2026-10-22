@@ -98,7 +98,7 @@ export function Machines() {
           <Info label="Warranty" value={detail.machine.warrantyEnd ? `until ${prettyDate(detail.machine.warrantyEnd)}` : '—'} />
           <Info label="Supplier" value={detail.machine.supplierName || '—'} />
         </div>
-        {detail.machine.photoUrl ? <img src={detail.machine.photoUrl} alt="" className="mb-4 max-h-64 rounded-3xl" /> : <img src="/mark.svg" alt="KS Sports" className="mb-4 h-16 w-16" />}
+        {detail.machine.photoUrl ? <img src={detail.machine.photoUrl} alt="" className="mb-4 max-h-64 rounded-3xl" /> : <img src="/logo.png" alt="KS Sports" className="mb-4 h-16 w-16 rounded-full object-cover" />}
         <label className="mb-4 inline-block text-sm font-semibold">
           Upload photo
           <input type="file" accept="image/png,image/jpeg,image/webp" className="mt-1 block" onChange={(event) => {

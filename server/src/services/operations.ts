@@ -22,7 +22,7 @@ import {
   Supplier,
 } from '../models.js';
 import { uploadsDir } from '../config.js';
-import { readDataUrl, removeUpload } from './files.js';
+import { brandLogoDataUrl, readDataUrl, removeUpload } from './files.js';
 import { commitStock } from './stock.js';
 import { isDuplicate } from '../util.js';
 
@@ -347,7 +347,6 @@ export function presentPurchase(purchase: {
   };
 }
 
-const MARK = `<svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 72 72"><rect width="72" height="72" rx="16" fill="#1d6b58"/><text x="36" y="46" text-anchor="middle" font-family="Georgia,serif" font-size="26" fill="#f3efe6">KS</text></svg>`;
 
 export async function catalogProducts(businessId: string, query: {
   category?: string;
@@ -384,8 +383,8 @@ export async function renderCatalogHtml(businessId: string, products: { name: st
   const showGst = Boolean(settings?.catalog?.showGst);
   const layout = settings?.catalog?.layout === 'list' ? 'list' : 'grid';
   const perPage = Math.min(12, Math.max(1, Number(settings?.catalog?.perPage) || 6));
-  const logo = await readDataUrl(business.logoPath || '');
-  const mark = logo ? `<img src="${logo}" alt="KS Sports"/>` : MARK;
+  const logo = (await readDataUrl(business.logoPath || '')) || (await brandLogoDataUrl());
+  const mark = `<img src="${logo}" alt="KS Sports"/>`;
   const cards = await Promise.all(
     products.map(async (product) => {
       const photo = product.images?.[0]?.path ? await readDataUrl(product.images[0].path) : '';
@@ -408,7 +407,7 @@ export async function renderCatalogHtml(businessId: string, products: { name: st
       @page { size: A4; margin: 12mm; }
       body { margin: 0; font-family: Inter, "Liberation Sans", sans-serif; color: #1c1915; }
       header { display: flex; gap: 16px; align-items: center; border-bottom: 3px solid #1d6b58; padding-bottom: 12px; margin-bottom: 16px; }
-      header img, header svg { width: 64px; height: 64px; }
+      header img { width: 92px; height: 92px; object-fit: cover; border-radius: 50%; }
       h1 { font-family: Georgia, serif; margin: 0; font-size: 32px; letter-spacing: 0.04em; }
       .tag { margin: 2px 0 0; color: #6f675e; }
       .grid { display: grid; grid-template-columns: ${layout === 'list' ? '1fr' : '1fr 1fr'}; gap: 12px; }

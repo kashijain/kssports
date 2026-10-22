@@ -12,7 +12,7 @@ import { presentInvoiceDetail } from '../present.js';
 import type { InvoiceInput } from '../schemas.js';
 import { escapeRegex, isDuplicate } from '../util.js';
 import { assertGstRate, customerFields, saveCustomer } from './catalog.js';
-import { readDataUrl } from './files.js';
+import { brandLogoDataUrl, readDataUrl } from './files.js';
 import { allocateInvoiceNumber } from './numbering.js';
 
 function asDomain(error: unknown): never {
@@ -82,7 +82,7 @@ async function sellerSnapshot(business: Awaited<ReturnType<typeof loadContext>>[
     state: business.state,
     stateCode: business.stateCode,
     pincode: business.pincode,
-    logoDataUrl: await readDataUrl(business.logoPath || ''),
+    logoDataUrl: (await readDataUrl(business.logoPath || '')) || (await brandLogoDataUrl()),
     signatureDataUrl: await readDataUrl(business.signaturePath || ''),
     bank: business.bank?.bankName ? business.bank : null,
     upiId: business.upiId || '',

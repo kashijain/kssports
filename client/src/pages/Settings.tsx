@@ -354,7 +354,7 @@ export function SettingsPage() {
       {tab === 'look' && defaults ? (
         <form onSubmit={saveLook} className="grid max-w-3xl gap-3 rounded-3xl border border-line bg-card p-4">
           <div className="grid gap-3 sm:grid-cols-2">
-            <ImageField label="Logo" url={business?.logoUrl || ''} onFile={(file) => void upload('logo', file)} onClear={() => void clearImage('logo')} disabled={!owner} />
+            <ImageField label="Logo" url={business?.logoUrl || '/logo.png'} removable={Boolean(business?.logoUrl?.startsWith('/uploads'))} onFile={(file) => void upload('logo', file)} onClear={() => void clearImage('logo')} disabled={!owner} />
             <ImageField label="Signature" url={business?.signatureUrl || ''} onFile={(file) => void upload('signature', file)} onClear={() => void clearImage('signature')} disabled={!owner} />
           </div>
           <Field label="Template">
@@ -488,17 +488,19 @@ function ImageField({
   onFile,
   onClear,
   disabled,
+  removable = true,
 }: {
   label: string;
   url: string;
   onFile: (file: File) => void;
   onClear: () => void;
   disabled: boolean;
+  removable?: boolean;
 }) {
   return (
     <div>
       <p className="mb-1 text-sm font-medium">{label}</p>
-      {url ? <img src={url} alt="" className="mb-2 h-16 max-w-full object-contain" /> : <p className="mb-2 text-xs text-muted">None yet. PNG, JPG, or WebP under 1.5 MB.</p>}
+      {url ? <img src={url} alt="" className="mb-2 h-20 w-20 rounded-full object-cover" /> : <p className="mb-2 text-xs text-muted">None yet. PNG, JPG, or WebP under 1.5 MB.</p>}
       <input
         type="file"
         accept="image/png,image/jpeg,image/webp"
@@ -509,7 +511,7 @@ function ImageField({
           event.target.value = '';
         }}
       />
-      {url && !disabled ? (
+      {url && removable && !disabled ? (
         <button type="button" className="mt-2 block text-xs text-clay-dark" onClick={onClear}>
           Remove
         </button>

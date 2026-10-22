@@ -2,6 +2,7 @@ import QRCode from 'qrcode';
 import { formatDisplayDate } from '../domain/dates.js';
 import { formatInr } from '../domain/money.js';
 import { statusLabel } from '../domain/constants.js';
+import { brandLogoDataUrl } from './files.js';
 import type { InvoiceView } from './invoiceView.js';
 
 function esc(value: unknown): string {
@@ -50,7 +51,7 @@ export async function renderInvoiceHtml(invoice: InvoiceView, opts?: { autoPrint
   const seller = invoice.seller;
   const customer = invoice.customer;
   const gst = invoice.isGstInvoice;
-  const logo = safeImage(seller.logoDataUrl);
+  const logo = safeImage(seller.logoDataUrl) || safeImage(await brandLogoDataUrl());
   const signature = safeImage(seller.signatureDataUrl);
   const showQr = Boolean(seller.upiId) && invoice.amountDue > 0 && invoice.status !== 'draft' && invoice.status !== 'cancelled';
   let qr = '';
@@ -151,7 +152,7 @@ export async function renderInvoiceHtml(invoice: InvoiceView, opts?: { autoPrint
     .top, .parties, .summary, .pay, .foot { display: flex; justify-content: space-between; gap: 18px; }
     .top { align-items: flex-start; }
     .brand { display: flex; gap: 12px; align-items: flex-start; max-width: 68%; }
-    .brand img.logo { width: 64px; height: 64px; object-fit: contain; }
+    .brand img.logo { width: 92px; height: 92px; object-fit: cover; border-radius: 50%; }
     .muted, .fine { color: #6f675e; }
     .fine { font-size: 10.5px; margin-top: 2px; }
     .meta { min-width: 210px; }
