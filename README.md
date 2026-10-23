@@ -50,7 +50,7 @@ npm run typecheck
 | `EXPOSE_RESET_LINK` | Returns the password-reset URL in the app when mail is not configured. Stays off in production unless set to `true`. |
 | `CHROME_PATH` | Optional. When Chrome is installed, invoice and catalog PDFs use it. Without it, KS Sports still writes the PDF itself. |
 | `COOKIE_SECURE` | Set `true` only behind HTTPS. Production turns this on. |
-| `CLIENT_ORIGIN` | Browser origin allowed to call the API with cookies. Use the exact Vercel origin in production. |
+| `CLIENT_ORIGIN` | Browser origins allowed to call the API. One origin, or several separated by commas. `kssportsbilling.vercel.app` and its Vercel preview links are already allowed. |
 | `CLOUDINARY_CLOUD_NAME` | Cloudinary cloud name. All three Cloudinary values are required before uploads leave disk. |
 | `CLOUDINARY_API_KEY` | Cloudinary API key. |
 | `CLOUDINARY_API_SECRET` | Cloudinary API secret. |

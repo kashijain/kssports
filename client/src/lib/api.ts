@@ -1,22 +1,48 @@
 const TOKEN_KEY = 'lekha_token';
+let memoryToken = '';
 
-export function authToken(): string {
+function readStoredToken(): string {
   try {
-    return sessionStorage.getItem(TOKEN_KEY) || '';
+    return localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY) || '';
   } catch {
     return '';
   }
 }
 
+export function authToken(): string {
+  if (!memoryToken) memoryToken = readStoredToken();
+  if (memoryToken) {
+    try {
+      localStorage.setItem(TOKEN_KEY, memoryToken);
+    } catch {
+      /* private mode keeps the token for this visit only */
+    }
+  }
+  return memoryToken;
+}
+
 export function saveAuthToken(token: string) {
+  memoryToken = token || '';
   try {
-    if (token) sessionStorage.setItem(TOKEN_KEY, token);
+    if (token) localStorage.setItem(TOKEN_KEY, token);
+    else localStorage.removeItem(TOKEN_KEY);
+  } catch {
+    /* private mode */
+  }
+  try {
+    sessionStorage.removeItem(TOKEN_KEY);
   } catch {
     /* private mode */
   }
 }
 
 export function clearAuthToken() {
+  memoryToken = '';
+  try {
+    localStorage.removeItem(TOKEN_KEY);
+  } catch {
+    /* private mode */
+  }
   try {
     sessionStorage.removeItem(TOKEN_KEY);
   } catch {
@@ -165,10 +191,27 @@ export async function downloadFile(path: string, filename: string) {
   const response = await authorizedResponse(path);
   if (!response.ok) throw await errorFrom(response);
   const blob = await response.blob();
+  const type = response.headers.get('content-type') || blob.type || 'application/octet-stream';
+  const file = new File([blob], filename, { type });
+  const phone = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  if (phone && typeof navigator.share === 'function') {
+    try {
+      if (!navigator.canShare || navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: filename });
+        return;
+      }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+    }
+  }
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
   link.download = filename;
+  link.target = '_blank';
+  link.rel = 'noopener';
+  document.body.appendChild(link);
   link.click();
-  URL.revokeObjectURL(url);
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }

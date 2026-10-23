@@ -7,7 +7,7 @@ import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import multer from 'multer';
 import { ZodError } from 'zod';
-import { clientDist, config, uploadsDir } from './config.js';
+import { clientDist, config, originAllowed, uploadsDir } from './config.js';
 import { HttpError } from './http.js';
 import { authRouter } from './routes/auth.js';
 import { businessRouter, metaRouter, settingsRouter, taxRouter } from './routes/business.js';
@@ -27,13 +27,7 @@ export function createApp() {
   }));
   app.use(cors({
     origin(origin, callback) {
-      if (!origin || origin === config.clientOrigin) {
-        callback(null, true);
-        return;
-      }
-      const local = /^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/.test(origin);
-      const preview = origin.endsWith('.cvm.dev') || origin.endsWith('.cursor.com');
-      callback(null, local || preview);
+      callback(null, originAllowed(origin));
     },
     credentials: true,
   }));

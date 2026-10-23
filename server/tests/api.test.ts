@@ -8,6 +8,17 @@ import { Business, Customer, Invoice, Product, User } from '../src/models.js';
 import mongoose from 'mongoose';
 
 const app = createApp();
+
+describe('shop origins', () => {
+  it('lets both KS Sports Vercel addresses call the API', async () => {
+    const phone = await request(app).get('/api/health').set('Origin', 'https://kssportsbilling.vercel.app');
+    expect(phone.headers['access-control-allow-origin']).toBe('https://kssportsbilling.vercel.app');
+    const preview = await request(app).get('/api/health').set('Origin', 'https://kssportsbilling-git-main-deployemntjain-8574.vercel.app');
+    expect(preview.headers['access-control-allow-origin']).toBe('https://kssportsbilling-git-main-deployemntjain-8574.vercel.app');
+    const stranger = await request(app).get('/api/health').set('Origin', 'https://evil.example');
+    expect(stranger.headers['access-control-allow-origin']).toBeUndefined();
+  });
+});
 const gstin = (state: string, pan: string) => {
   const body = `${state}${pan}1Z`;
   return body + gstinCheckCharacter(body);
