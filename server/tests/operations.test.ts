@@ -180,6 +180,13 @@ describe('KS Sports operations', () => {
     const filled = await agent.get('/api/purchases/download?format=csv');
     expect(filled.text).toContain(purchase.body.purchase.number);
     expect(filled.text).toContain('ABC Sports Pvt Ltd');
+    const oneBill = await agent.get(`/api/purchases/${purchase.body.purchase.id}/pdf`).buffer(true);
+    expect(oneBill.status).toBe(200);
+    expect(oneBill.body.subarray(0, 4).toString()).toBe('%PDF');
+    const everyBill = await agent.get('/api/purchases/download?format=bills').buffer(true);
+    expect(everyBill.status).toBe(200);
+    expect(everyBill.headers['content-disposition']).toContain('ks-sports-purchase-bills.pdf');
+    expect(everyBill.body.subarray(0, 4).toString()).toBe('%PDF');
     const bill = await agent
       .post(`/api/purchases/${purchase.body.purchase.id}/bill`)
       .attach('file', Buffer.from('%PDF-1.4\n%%EOF'), { filename: 'ABC_Sports_Invoice_1054.pdf', contentType: 'application/pdf' });

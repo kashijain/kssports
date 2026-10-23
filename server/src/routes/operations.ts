@@ -19,7 +19,7 @@ import {
 import { presentInvoiceListItem } from '../present.js';
 import { discardRejectedUpload, documentUpload, publicAssetUrl, removeUpload, storedPublicImage, upload } from '../services/files.js';
 import { withPdf } from '../services/pdf.js';
-import { purchaseRegisterPdf, renderCatalogPdf } from '../services/shopPdf.js';
+import { purchaseBillsPdf, purchaseRegisterPdf, renderCatalogPdf } from '../services/shopPdf.js';
 import { toCsv } from '../services/reports.js';
 import {
   cancelPurchase,
@@ -182,9 +182,30 @@ opsRouter.get(
       res.send(csv);
       return;
     }
-    const pdf = await purchaseRegisterPdf(business?.name || 'KS Sports', list);
+    const shop = business?.name || 'KS Sports';
+    if (format === 'bills') {
+      const pdf = await purchaseBillsPdf(shop, rows.map(purchaseBill));
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'attachment; filename="ks-sports-purchase-bills.pdf"');
+      res.send(pdf);
+      return;
+    }
+    const pdf = await purchaseRegisterPdf(shop, list);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'attachment; filename="ks-sports-wholesale-purchases.pdf"');
+    res.send(pdf);
+  }),
+);
+
+opsRouter.get(
+  '/purchases/:id/pdf',
+  asyncHandler(async (req, res) => {
+    const purchase = await Purchase.findOne({ _id: req.params.id, businessId: req.auth!.businessId });
+    if (!purchase) throw new HttpError(404, 'Purchase not found.');
+    const business = await Business.findById(req.auth!.businessId);
+    const pdf = await purchaseBillsPdf(business?.name || 'KS Sports', [purchaseBill(purchase)]);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${purchase.number}.pdf"`);
     res.send(pdf);
   }),
 );
@@ -519,6 +540,37 @@ opsRouter.delete(
     res.json({ ok: true });
   }),
 );
+
+function purchaseBill(purchase: {
+  number: string;
+  supplierInvoice?: string;
+  purchaseDateKey: string;
+  status: string;
+  supplierSnapshot?: { name?: string; company?: string };
+  totals?: { grandTotal?: number };
+  amountPaid?: number;
+  amountDue?: number;
+  items?: { name?: string; quantity?: number; purchasePrice?: number; gstRate?: number; total?: number }[];
+}) {
+  return {
+    number: purchase.number,
+    supplier: purchase.supplierSnapshot?.name || '',
+    company: purchase.supplierSnapshot?.company || '',
+    invoice: purchase.supplierInvoice || '',
+    date: purchase.purchaseDateKey,
+    status: purchase.status,
+    total: purchase.totals?.grandTotal || 0,
+    paid: purchase.amountPaid || 0,
+    due: purchase.amountDue || 0,
+    items: (purchase.items || []).map((item) => ({
+      name: item.name || '',
+      quantity: item.quantity || 0,
+      rate: item.purchasePrice || 0,
+      gstRate: item.gstRate || 0,
+      total: item.total || 0,
+    })),
+  };
+}
 
 function catalogQuery(source: Record<string, unknown>) {
   const ids = String(source.ids || '')

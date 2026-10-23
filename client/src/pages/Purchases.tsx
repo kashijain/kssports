@@ -111,9 +111,18 @@ export function Purchases() {
     await api(`/api/purchases/${purchaseId}/bill`, { method: 'POST', body });
   }
 
-  async function downloadList(format: 'csv' | 'pdf') {
+  async function downloadList(format: 'csv' | 'pdf' | 'bills') {
     try {
-      await downloadFile(`/api/purchases/download?format=${format}`, `ks-sports-wholesale-purchases.${format}`);
+      const filename = format === 'bills' ? 'ks-sports-purchase-bills.pdf' : `ks-sports-wholesale-purchases.${format}`;
+      await downloadFile(`/api/purchases/download?format=${format}`, filename);
+    } catch (error) {
+      fail(error);
+    }
+  }
+
+  async function downloadBill(row: Purchase) {
+    try {
+      await downloadFile(`/api/purchases/${row.id}/pdf`, `${row.number}.pdf`);
     } catch (error) {
       fail(error);
     }
@@ -139,6 +148,7 @@ export function Purchases() {
           <div className="flex flex-wrap gap-2">
             <Button variant="secondary" onClick={() => void downloadList('csv')}>Download CSV</Button>
             <Button variant="secondary" onClick={() => void downloadList('pdf')}>Download PDF</Button>
+            <Button variant="secondary" onClick={() => void downloadList('bills')}>Download bills</Button>
             <Button onClick={() => setOpen(true)}>New purchase</Button>
           </div>
         }
@@ -162,17 +172,17 @@ export function Purchases() {
                   <td>{inr(row.totals?.grandTotal)}</td>
                   <td>{inr(row.amountDue)}</td>
                   <td onClick={(event) => event.stopPropagation()}>
-                    {row.documents?.[0] ? (
-                      <span className="flex flex-wrap gap-3">
-                        <DocumentFileLink id={row.documents[0].id} name={row.documents[0].name} mode="view" className="font-semibold">View</DocumentFileLink>
-                        <DocumentFileLink id={row.documents[0].id} name={row.documents[0].name} mode="download" className="font-semibold">Download</DocumentFileLink>
-                      </span>
-                    ) : (
-                      <label className="cursor-pointer font-semibold text-clay-dark">
-                        Upload bill
-                        <input type="file" accept="application/pdf,image/jpeg,image/png,.pdf,.jpg,.jpeg,.png" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadBill(row.id, file); event.target.value = ''; }} />
-                      </label>
-                    )}
+                    <span className="flex flex-wrap gap-3">
+                      <button type="button" className="font-semibold" onClick={() => void downloadBill(row)}>Download</button>
+                      {row.documents?.[0] ? (
+                        <DocumentFileLink id={row.documents[0].id} name={row.documents[0].name} mode="download" className="font-semibold">Their file</DocumentFileLink>
+                      ) : (
+                        <label className="cursor-pointer font-semibold text-clay-dark">
+                          Upload bill
+                          <input type="file" accept="application/pdf,image/jpeg,image/png,.pdf,.jpg,.jpeg,.png" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadBill(row.id, file); event.target.value = ''; }} />
+                        </label>
+                      )}
+                    </span>
                   </td>
                   <td><Badge status={row.status} label={row.status} /></td>
                 </tr>

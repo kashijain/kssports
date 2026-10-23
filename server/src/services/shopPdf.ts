@@ -556,6 +556,92 @@ export function purchaseRegisterPdf(
   });
 }
 
+export function purchaseBillsPdf(
+  shop: string,
+  purchases: {
+    number: string;
+    supplier: string;
+    company?: string;
+    invoice: string;
+    date: string;
+    status: string;
+    total: number;
+    paid: number;
+    due: number;
+    items: { name: string; quantity: number; rate: number; gstRate: number; total: number }[];
+  }[],
+): Promise<Buffer> {
+  return renderPdf((doc) => {
+    const left = doc.page.margins.left;
+    const width = contentWidth(doc);
+    const bills = purchases.length ? purchases : [];
+    if (!bills.length) {
+      say(doc, clean(shop) || 'KS Sports', left, doc.page.margins.top, width, 'Strong', 18);
+      say(doc, 'No wholesale purchases yet.', left, doc.y + 8, width, 'Body', 11);
+      return;
+    }
+    bills.forEach((purchase, index) => {
+      if (index > 0) doc.addPage();
+      let y = doc.page.margins.top;
+      say(doc, clean(shop) || 'KS Sports', left, y, width * 0.62, 'Strong', 16);
+      say(doc, 'Purchase bill', left + width * 0.62, y, width * 0.38, 'Body', 10, MUTED, 'right');
+      y = doc.y + 4;
+      y += say(doc, purchase.number, left, y, width, 'Strong', 18);
+      const supplier = [clean(purchase.supplier), clean(purchase.company)].filter(Boolean).join(' · ');
+      const meta = [
+        supplier ? `Supplier: ${supplier}` : '',
+        purchase.invoice ? `Their invoice: ${clean(purchase.invoice)}` : '',
+        purchase.date ? `Date: ${formatDisplayDate(purchase.date)}` : '',
+        `Status: ${statusLabel(purchase.status)}`,
+      ].filter(Boolean);
+      for (const line of meta) y += say(doc, line, left, y + 2, width, 'Body', 10, MUTED) + 2;
+      y += 8;
+      const weights = [220, 50, 80, 50, 80];
+      const weightSum = weights.reduce((sum, weight) => sum + weight, 0);
+      const cols = weights.map((weight) => (weight / weightSum) * width);
+      const headers = ['Item', 'Qty', 'Rate', 'GST', 'Amount'];
+      const aligns: Array<'left' | 'right'> = ['left', 'right', 'right', 'right', 'right'];
+      headers.forEach((header, headerIndex) => {
+        const x = left + cols.slice(0, headerIndex).reduce((sum, column) => sum + column, 0);
+        say(doc, header, x, y, cols[headerIndex] - 4, 'Body', 8, MUTED, aligns[headerIndex]);
+      });
+      y += 14;
+      doc.moveTo(left, y).lineTo(left + width, y).strokeColor(GREEN).lineWidth(1.5).stroke();
+      y += 6;
+      const lines = purchase.items.length ? purchase.items : [];
+      if (!lines.length) {
+        y += say(doc, 'No lines on this purchase.', left, y, width, 'Body', 10, MUTED);
+        y += 8;
+      }
+      for (const item of lines) {
+        const values = [clean(item.name) || 'Item', String(item.quantity), money(item.rate), `${item.gstRate || 0}%`, money(item.total)];
+        doc.font('Body').fontSize(9);
+        const rowH = Math.max(...values.map((value, valueIndex) => doc.heightOfString(value || ' ', { width: cols[valueIndex] - 4 }))) + 6;
+        if (y + rowH > pageBottom(doc)) {
+          doc.addPage();
+          y = doc.page.margins.top;
+        }
+        values.forEach((value, valueIndex) => {
+          const x = left + cols.slice(0, valueIndex).reduce((sum, column) => sum + column, 0);
+          say(doc, value, x, y, cols[valueIndex] - 4, valueIndex === 0 ? 'Strong' : 'Body', 9, INK, aligns[valueIndex]);
+        });
+        y += rowH;
+        doc.moveTo(left, y - 2).lineTo(left + width, y - 2).strokeColor(LINE).lineWidth(0.4).stroke();
+      }
+      if (y + 48 > pageBottom(doc)) {
+        doc.addPage();
+        y = doc.page.margins.top;
+      }
+      y += 10;
+      say(doc, `Total ${money(purchase.total)}`, left, y, width, 'Strong', 12, INK, 'right');
+      y = doc.y + 2;
+      say(doc, `Paid ${money(purchase.paid)}`, left, y, width, 'Body', 10, INK, 'right');
+      y = doc.y + 2;
+      say(doc, `Due ${money(purchase.due)}`, left, y, width, 'Strong', 11, INK, 'right');
+    });
+  });
+}
+
 export function textPdf(title: string, lines: string[]): Promise<Buffer> {
   return renderPdf((doc) => {
     const width = contentWidth(doc);
